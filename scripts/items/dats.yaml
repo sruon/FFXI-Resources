@@ -1,0 +1,43 @@
+furniture: ROM/74/21.DAT
+
+item_dats:
+  - en: ROM/118/106.DAT
+    ja: ROM/0/4.DAT
+    base_id: 0
+    max_count: 4096
+  - en: ROM/118/107.DAT
+    ja: ROM/0/5.DAT
+    base_id: 4096
+    max_count: 4096
+  - en: ROM/301/115.DAT
+    ja: ROM/301/114.DAT
+    base_id: 8704
+    max_count: 1536
+  - en: ROM/118/109.DAT
+    ja: ROM/0/7.DAT
+    base_id: 10240
+    max_count: 6144
+  - en: ROM/118/108.DAT
+    ja: ROM/0/6.DAT
+    base_id: 16384
+    max_count: 6656
+  - en: ROM/286/73.DAT
+    ja: ROM/286/72.DAT
+    base_id: 23040
+    max_count: 5632
+  - en: ROM/217/21.DAT
+    ja: ROM/217/20.DAT
+    base_id: 28672
+    max_count: 1024
+  - en: ROM/118/110.DAT
+    ja: ROM/0/8.DAT
+    base_id: 8192
+    max_count: 512
+  - en: ROM/174/48.DAT
+    ja: ROM/0/9.DAT
+    base_id: 65535
+    max_count: 16
+  - en: ROM/288/67.DAT
+    ja: ROM/288/66.DAT
+    base_id: 61441
+    max_count: 512
