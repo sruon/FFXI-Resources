@@ -21,26 +21,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(SCRIPT_DIR, "..", "..", "dist")
 
 
-def _load_entities() -> tuple[dict[int, str], dict[int, dict[int, str]]]:
-    """Returns (global_entity_lookup, per_zone_entity_lookup)."""
+def _load_entities_by_zone() -> dict[int, dict[int, str]]:
+    """Per-zone entity lookup — used by xi-events for in-Lua name resolution."""
     path = os.path.join(DIST_DIR, "entities.ndjson.gz")
-    if not os.path.exists(path):
-        return {}, {}
-    by_id: dict[int, str] = {}
-    by_zone: dict[int, dict[int, str]] = {}
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            rec = json.loads(line)
-            by_id[rec["entity_id"]] = rec["name"]
-            by_zone.setdefault(rec["zone_id"], {})[rec["entity_id"]] = rec["name"]
-    return by_id, by_zone
-
-
-def _load_strings() -> dict[int, dict[int, str]]:
-    path = os.path.join(DIST_DIR, "strings.ndjson.gz")
     if not os.path.exists(path):
         return {}
     by_zone: dict[int, dict[int, str]] = {}
@@ -50,7 +33,7 @@ def _load_strings() -> dict[int, dict[int, str]]:
             if not line:
                 continue
             rec = json.loads(line)
-            by_zone.setdefault(rec["zone_id"], {})[rec["string_id"]] = rec["content"]
+            by_zone.setdefault(rec["zone_id"], {})[rec["entity_id"]] = rec["name"]
     return by_zone
 
 
@@ -104,7 +87,7 @@ def _is_fragment(event_id: int) -> bool:
 class EventDumper(DumpScript):
     """FFXI event dumper — bytecode + decompiled Lua + static analysis in one pass."""
     produces = ["events"]
-    consumes = ["entities", "strings", "items"]
+    consumes = ["entities", "items"]
 
     def __init__(self):
         with open(os.path.join(SCRIPT_DIR, "dats.yaml")) as f:
@@ -125,12 +108,11 @@ class EventDumper(DumpScript):
             if events_dat:
                 zone_list.append({"id": zone["id"], "name": zone["name"], "events_dat": events_dat})
 
-        entity_lookup, entities_by_zone = _load_entities()
-        strings_by_zone = _load_strings()
+        entities_by_zone = _load_entities_by_zone()
         items_lookup = _load_items()
         logger.info(
-            "Loaded {} entities / {} zones with strings / {} items",
-            len(entity_lookup), len(strings_by_zone), len(items_lookup),
+            "Loaded {} zones of entities / {} items",
+            len(entities_by_zone), len(items_lookup),
         )
 
         work = [(zone, base_path) for zone in zone_list]
@@ -154,12 +136,10 @@ class EventDumper(DumpScript):
 
         for zone in zone_data:
             zid = zone["id"]
-            zone_strings = strings_by_zone.get(zid, {})
             zone_entities = entities_by_zone.get(zid, {})
             block_counter: dict[int, int] = {}
             for block in sorted(zone["blocks"], key=lambda b: b["entity_id"]):
                 actor_id = block["entity_id"]
-                actor_name = entity_lookup.get(actor_id)
                 block_idx = block_counter.get(actor_id, 0)
                 block_counter[actor_id] = block_idx + 1
                 imed_data = list(block["data"])
@@ -189,7 +169,7 @@ class EventDumper(DumpScript):
                             bytecode=bytes.fromhex(byte_code),
                             entrypoint=entrypoint,
                             imed_data=imed_data,
-                            strings=zone_strings,
+                            strings={},
                             entities=zone_entities,
                             items=items_lookup,
                         )
@@ -221,7 +201,6 @@ class EventDumper(DumpScript):
                     events_rows.append({
                         "zone_id": zid,
                         "actor_id": actor_id,
-                        "actor_name": actor_name,
                         "block": block_idx,
                         "idx": idx,
                         "event_id": event_id,
@@ -263,7 +242,6 @@ class EventDumper(DumpScript):
         events_schema = pa.schema([
             pa.field("zone_id", pa.int32()),
             pa.field("actor_id", pa.int64()),
-            pa.field("actor_name", pa.string()),
             pa.field("block", pa.int32()),
             pa.field("idx", pa.int32()),
             pa.field("event_id", pa.int32()),

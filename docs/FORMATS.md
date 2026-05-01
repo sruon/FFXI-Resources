@@ -178,7 +178,6 @@ Single self-contained file: raw bytecode, decompiled Lua, and static-analysis fi
 {
   "zone_id": 100,
   "actor_id": 16785749,
-  "actor_name": "Guilloud",
   "block": 0,
   "idx": 3,
   "event_id": 33,
@@ -201,8 +200,7 @@ Primary key: `(zone_id, actor_id, block, idx)`.
 | Field | Type | Notes |
 |---|---|---|
 | `zone_id` | int | Join against `zones.parquet` for the human-readable name |
-| `actor_id` | int | Owning entity. Sentinels (`0x7FFFFFC0–0x7FFFFFF9`) kept raw |
-| `actor_name` | string \| null | `null` for sentinels and zone-level scripts |
+| `actor_id` | int | Owning entity. Join against `entities.parquet` on `(zone_id, entity_id)` for the actor name. Sentinels (`0x7FFFFFC0–0x7FFFFFF9`) kept raw |
 | `block` | int | Zero-based block ordinal for this `(zone_id, actor_id)`. A few zones (e.g. Aht Urhgan Whitegate phases) ship multiple event DATs that share an `actor_id` — each block has its own bytecode/imed |
 | `idx` | int | Zero-based position within this block's events list. Disambiguates events that share an `event_id` (~47% of actors have duplicates) |
 | `event_id` | int | Signed 16-bit. `-1` = `0xFFFF` fragment, `-2` = `0xFFFE`, etc. **Not unique within a block.** Fragments don't get decompiled |
