@@ -67,7 +67,7 @@ def parse_autotranslate(file_path: str) -> list[dict]:
             entry_count = 0
 
         # Parse entries
-        entries = {}
+        entries = []
         p = entry_start
         for _ in range(entry_count):
             if p + 5 > len(data) or data[p] != 0x02 or data[p + 1] != 0x02:
@@ -90,13 +90,14 @@ def parse_autotranslate(file_path: str) -> list[dict]:
                     p += 1
                 continue
             key_bytes = bytes([0x02, 0x02, cat_id, entry_id])
-            entries[entry_id] = {"text": text, "key": key_bytes.hex()}
+            entries.append({"id": entry_id, "text": text, "key": key_bytes.hex()})
             p += str_len
 
             # Skip null padding
             while p < len(data) and data[p] == 0:
                 p += 1
 
+        entries.sort(key=lambda x: x["id"])
         categories.append({"name": cat_name, "entries": entries})
         pos = p
 

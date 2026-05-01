@@ -18,6 +18,16 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install xi-tinkerer wheel
+        run: |
+          gh release download latest \
+            --repo sruon/xi-tinkerer-py \
+            --pattern '*manylinux*x86_64.whl' \
+            --output xi_tinkerer.whl
+          pip install xi_tinkerer.whl
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - run: pip install -e .
 
       - name: Build DAT file list
@@ -39,10 +49,16 @@ jobs:
       - name: Run all dump scripts
         run: |
           VERSION="${{ steps.ffxi.outputs.version }}"
+          # events_scripts depends on output of all other dumpers — run it last
           for script in scripts/*/dump.py; do
+            case "$script" in
+              scripts/events_scripts/*) continue ;;
+            esac
             echo "=== Running $script ==="
             python3 "$script" dump --version "$VERSION" --base-path dat --output-dir dist
           done
+          echo "=== Running scripts/events_scripts/dump.py ==="
+          python3 scripts/events_scripts/dump.py dump --version "$VERSION" --base-path dat --output-dir dist
 
       - name: Check for existing release
         id: check

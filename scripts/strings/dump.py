@@ -10,7 +10,8 @@ from loguru import logger
 
 from parsers.strings import parse_string_dat_english, format_string
 from scripts.base import DumpScript
-from writers.json import write_json_gz
+from writers.json import write_ndjson_gz
+from writers.parquet import write_parquet
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -31,16 +32,17 @@ def _parse_zone(args):
         logger.error("Failed to parse {}: {}", zone["name"], e)
         return None
 
-    strings = {}
+    strings = []
     for s in parsed.strings:
         text = format_string(s.text)
         if len(text) <= 1:
             continue
-        strings[s.index] = text
+        strings.append({"id": s.index, "content": text})
 
     if not strings:
         return None
 
+    strings.sort(key=lambda x: x["id"])
     return {
         "id": zone["id"],
         "name": zone["name"],
@@ -66,11 +68,22 @@ class StringDumper(DumpScript):
             results = pool.map(_parse_zone, work)
 
         zone_data = sorted([r for r in results if r], key=lambda z: z["id"])
-        total = sum(len(z["strings"]) for z in zone_data)
-        logger.info("Parsed {} strings across {} zones", total, len(zone_data))
 
-        payload = {"version": version, "zones": zone_data}
-        write_json_gz(payload, os.path.join(output_dir, "strings.json.gz"))
+        rows = []
+        for zone in zone_data:
+            for s in zone["strings"]:
+                rows.append({
+                    "zone_id": zone["id"],
+                    "zone_name": zone["name"],
+                    "string_id": s["id"],
+                    "content": s["content"],
+                })
+
+        logger.info("Parsed {} strings across {} zones", len(rows), len(zone_data))
+
+        meta = {"version": version, "schema_version": 1}
+        write_ndjson_gz(rows, os.path.join(output_dir, "strings.ndjson.gz"), meta=meta)
+        write_parquet(rows, os.path.join(output_dir, "strings.parquet"))
 
 
 if __name__ == "__main__":

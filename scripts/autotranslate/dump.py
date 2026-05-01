@@ -8,8 +8,8 @@ from loguru import logger
 
 from parsers.autotranslate import parse_autotranslate
 from scripts.base import DumpScript
-from writers.json import write_json_gz
-from writers.yaml import write_yaml
+from writers.json import write_ndjson_gz
+from writers.parquet import write_parquet
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -28,17 +28,21 @@ class AutoTranslateDumper(DumpScript):
         en_path = os.path.join(base_path, self.spec["en"])
         categories = parse_autotranslate(en_path)
 
-        total = sum(len(c.get("entries", {})) for c in categories)
-        logger.info(
-            "Parsed {} auto-translate entries across {} categories",
-            total,
-            len(categories),
-        )
+        rows = []
+        for cat in categories:
+            for entry in cat.get("entries", []):
+                rows.append({
+                    "category_name": cat["name"],
+                    "entry_id": entry["id"],
+                    "text": entry["text"],
+                    "key": entry["key"],
+                })
 
-        payload = {"version": version, "categories": categories}
+        logger.info("Parsed {} auto-translate entries across {} categories", len(rows), len(categories))
 
-        write_yaml(payload, os.path.join(output_dir, "autotranslate.yaml"))
-        write_json_gz(payload, os.path.join(output_dir, "autotranslate.json.gz"))
+        meta = {"version": version, "schema_version": 1}
+        write_ndjson_gz(rows, os.path.join(output_dir, "autotranslate.ndjson.gz"), meta=meta)
+        write_parquet(rows, os.path.join(output_dir, "autotranslate.parquet"))
 
 
 if __name__ == "__main__":

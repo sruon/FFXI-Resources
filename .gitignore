@@ -3,3 +3,4 @@ __pycache__/
 *.egg-info/
 .idea/
 .claude/
+SESSION_NOTES.md
