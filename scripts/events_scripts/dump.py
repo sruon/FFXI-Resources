@@ -12,6 +12,8 @@ from xi_events import Dataset, analyze, decompile
 
 class EventScriptDumper(DumpScript):
     """FFXI event bytecode -> Lua decompiler. Reads from dist/ produced by other dumpers."""
+    produces = ["events_scripts"]
+    consumes = ["events", "events_actors", "strings", "entities", "items", "spells", "abilities"]
 
     def list_files(self) -> list[str]:
         return []

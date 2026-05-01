@@ -18,6 +18,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class ItemDumper(DumpScript):
     """FFXI item dumper"""
+    produces = ["items"]
 
     def __init__(self):
         with open(os.path.join(SCRIPT_DIR, "dats.yaml")) as f:

@@ -24,6 +24,7 @@ def _dmsg_to_dict(dmsg_data: dict) -> dict[int, str]:
 
 class ZoneDumper(DumpScript):
     """FFXI zone (area) name dumper — long, alt (abbreviated), and short forms."""
+    produces = ["zones"]
 
     def __init__(self):
         with open(os.path.join(SCRIPT_DIR, "dats.yaml")) as f:

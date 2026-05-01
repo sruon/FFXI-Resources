@@ -52,6 +52,7 @@ def _parse_zone(args):
 
 class StringDumper(DumpScript):
     """FFXI zone dialog string dumper"""
+    produces = ["strings"]
 
     def __init__(self):
         with open(os.path.join(SCRIPT_DIR, "dats.yaml")) as f:

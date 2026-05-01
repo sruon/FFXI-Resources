@@ -6,6 +6,13 @@ DEFAULT_BASE = r"C:\Program Files (x86)\PlayOnline\SquareEnix\FINAL FANTASY XI"
 
 
 class DumpScript(ABC):
+    # Artifact names this dumper writes to dist/. Other dumpers reference these via `consumes`.
+    # Convention: matches the output basename (e.g. "events" for events.{ndjson.gz,parquet}).
+    produces: list[str] = []
+
+    # Artifact names this dumper reads from dist/ before it can run.
+    consumes: list[str] = []
+
     @abstractmethod
     def list_files(self) -> list[str]: ...
 

@@ -16,6 +16,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class AutoTranslateDumper(DumpScript):
     """FFXI auto-translate dumper"""
+    produces = ["autotranslate"]
 
     def __init__(self):
         with open(os.path.join(SCRIPT_DIR, "dats.yaml")) as f:

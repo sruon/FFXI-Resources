@@ -17,6 +17,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class EntityDumper(DumpScript):
     """FFXI entity name dumper (per zone)"""
+    produces = ["entities"]
 
     def __init__(self):
         with open(os.path.join(SCRIPT_DIR, "dats.yaml")) as f:

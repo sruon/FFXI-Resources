@@ -60,6 +60,8 @@ def _parse_zone(args):
 
 class EventDumper(DumpScript):
     """FFXI event dumper — extracts per-event bytecode via xi-tinkerer."""
+    produces = ["events", "events_actors"]
+    consumes = ["entities"]  # entity_lookup for actor_name resolution
 
     def __init__(self):
         with open(os.path.join(SCRIPT_DIR, "dats.yaml")) as f:

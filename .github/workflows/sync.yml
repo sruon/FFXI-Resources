@@ -37,18 +37,7 @@ jobs:
           BUCKET_APP_KEY: ${{ secrets.BUCKET_APP_KEY }}
 
       - name: Run all dump scripts
-        run: |
-          VERSION="${{ steps.ffxi.outputs.version }}"
-          # events_scripts depends on output of all other dumpers — run it last
-          for script in scripts/*/dump.py; do
-            case "$script" in
-              scripts/events_scripts/*) continue ;;
-            esac
-            echo "=== Running $script ==="
-            python3 "$script" dump --version "$VERSION" --base-path dat --output-dir dist
-          done
-          echo "=== Running scripts/events_scripts/dump.py ==="
-          python3 scripts/events_scripts/dump.py dump --version "$VERSION" --base-path dat --output-dir dist
+        run: python3 scripts/run_all.py dump --version "${{ steps.ffxi.outputs.version }}" --base-path dat --output-dir dist
 
       - name: Check for existing release
         id: check
