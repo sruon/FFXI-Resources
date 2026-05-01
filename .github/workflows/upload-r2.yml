@@ -1,0 +1,122 @@
+name: Upload to R2
+
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to upload (defaults to latest)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Resolve target tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAG: ${{ inputs.tag }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ -n "$EVENT_TAG" ]; then
+            echo "tag=$EVENT_TAG" >> "$GITHUB_OUTPUT"
+          elif [ -n "$INPUT_TAG" ]; then
+            echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          else
+            tag=$(gh release view --json tagName --jq .tagName)
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          mkdir -p dist
+          gh release download "$TAG" --dir dist
+          ls -la dist | head -20
+
+      - name: Upload to R2
+        env:
+          VERSION: ${{ steps.tag.outputs.tag }}
+          ENDPOINT: https://5ab2e190b7cfef75dcbfebcf15b14352.r2.cloudflarestorage.com
+          BUCKET: ffxi-resources
+          R2_KEY_ID: ${{ secrets.RESOURCES_BUCKET_KEY_ID }}
+          R2_APP_KEY: ${{ secrets.RESOURCES_BUCKET_APP_KEY }}
+        run: |
+          pip install -q boto3
+          python3 - <<'PY'
+          import hashlib, json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import boto3
+          from botocore.exceptions import ClientError
+
+          version = os.environ["VERSION"]
+          bucket = os.environ["BUCKET"]
+          s3 = boto3.client(
+              "s3",
+              endpoint_url=os.environ["ENDPOINT"],
+              aws_access_key_id=os.environ["R2_KEY_ID"],
+              aws_secret_access_key=os.environ["R2_APP_KEY"],
+              region_name="auto",
+          )
+          dist = Path("dist")
+
+          manifest = {"version": version, "generated_at": datetime.now(timezone.utc).isoformat(), "files": {}}
+          for p in sorted(dist.iterdir()):
+              if not p.is_file():
+                  continue
+              h = hashlib.sha256()
+              with p.open("rb") as fp:
+                  for chunk in iter(lambda: fp.read(1 << 20), b""):
+                      h.update(chunk)
+              manifest["files"][p.name] = {"size": p.stat().st_size, "sha256": h.hexdigest()}
+
+          for name in manifest["files"]:
+              key = f"versions/{version}/{name}"
+              print(f"  PUT {key}", flush=True)
+              s3.upload_file(str(dist / name), bucket, key,
+                             ExtraArgs={"CacheControl": "public, max-age=300"})
+
+          s3.put_object(Bucket=bucket, Key=f"versions/{version}/manifest.json",
+                        Body=json.dumps(manifest, indent=2).encode(),
+                        ContentType="application/json",
+                        CacheControl="public, max-age=300")
+
+          try:
+              obj = s3.get_object(Bucket=bucket, Key="versions.json")
+              index = json.loads(obj["Body"].read())
+          except ClientError as e:
+              if e.response["Error"]["Code"] not in ("NoSuchKey", "404"):
+                  raise
+              index = {"versions": []}
+
+          existing = {v["version"]: v for v in index.get("versions", [])}
+          existing[version] = {
+              "version": version,
+              "published_at": manifest["generated_at"],
+              "manifest": f"versions/{version}/manifest.json",
+              "file_count": len(manifest["files"]),
+          }
+          index["versions"] = sorted(existing.values(), key=lambda v: v["version"])
+          index["latest"] = index["versions"][-1]["version"]
+
+          s3.put_object(Bucket=bucket, Key="versions.json",
+                        Body=json.dumps(index, indent=2).encode(),
+                        ContentType="application/json",
+                        CacheControl="public, max-age=60")
+
+          print(f"Uploaded {len(manifest['files'])} files. Latest: {index['latest']}")
+          PY
