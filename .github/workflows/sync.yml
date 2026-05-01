@@ -18,16 +18,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install xi-tinkerer wheel
-        run: |
-          gh release download latest \
-            --repo sruon/xi-tinkerer-py \
-            --pattern '*manylinux*x86_64.whl' \
-            --output xi_tinkerer.whl
-          pip install xi_tinkerer.whl
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - run: pip install -e .
 
       - name: Build DAT file list

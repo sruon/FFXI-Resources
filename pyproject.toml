@@ -13,6 +13,9 @@ dependencies = [
     "pillow>=10.0",
     "pyarrow>=15.0",
     "xi-events @ git+https://github.com/sruon/xi-events-py.git",
+    "xi-tinkerer @ https://github.com/sruon/xi-tinkerer-py/releases/download/latest/xi_tinkerer-0.1.0-cp311-abi3-manylinux_2_34_x86_64.whl ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "xi-tinkerer @ https://github.com/sruon/xi-tinkerer-py/releases/download/latest/xi_tinkerer-0.1.0-cp311-abi3-win_amd64.whl ; sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "xi-tinkerer @ https://github.com/sruon/xi-tinkerer-py/releases/download/latest/xi_tinkerer-0.1.0-cp311-abi3-macosx_11_0_arm64.whl ; sys_platform == 'darwin' and platform_machine == 'arm64'",
     "pydantic>=2.0",
     "pyyaml>=6.0",
 ]
