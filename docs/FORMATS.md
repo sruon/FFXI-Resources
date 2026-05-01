@@ -24,6 +24,7 @@ Both contain the same data. NDJSON has a sidecar `<name>.meta.json` with `versio
 | `items.schema.json` | JSON Schema for items |
 | `strings.{ndjson.gz,parquet}` | Zone dialog strings (one string per row) |
 | `entities.{ndjson.gz,parquet}` | Entity names (one entity per row) |
+| `zones.{ndjson.gz,parquet}` | Zone names — long, alt (abbreviated), short (one zone per row) |
 | `autotranslate.{ndjson.gz,parquet}` | Auto-translate phrases (one entry per row) |
 | `events.{ndjson.gz,parquet}` | Event records (one event per row) |
 | `events_actors.{ndjson.gz,parquet}` | Actor blocks with bytecode + imed_data |
@@ -129,6 +130,28 @@ One row per entity. Sort: `(zone_id, entity_id)`.
 
 ---
 
+## zones.ndjson.gz
+
+One row per zone. Sort: `(id)`.
+
+```json
+{
+  "id": 100,
+  "name": "West Ronfaure",
+  "name_alt": "W.Ronfaure",
+  "name_short": "WRonfaure"
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | int | Zone ID |
+| `name` | string | Full name (from `ROM/165/84.DAT`) |
+| `name_alt` | string | Abbreviated name (from `ROM/165/83.DAT`) |
+| `name_short` | string | Short name (from `ROM/165/85.DAT`) |
+
+---
+
 ## autotranslate.ndjson.gz
 
 One row per phrase. Sort: `(category_name, entry_id)`.
@@ -153,7 +176,7 @@ One row per phrase. Sort: `(category_name, entry_id)`.
 
 ## events.ndjson.gz
 
-One row per event. Sort: `(zone_id, actor_id, event_id, offset)`.
+One row per event. Sort: `(zone_id, actor_id, idx)`. Schema version 2.
 
 ```json
 {
@@ -161,11 +184,11 @@ One row per event. Sort: `(zone_id, actor_id, event_id, offset)`.
   "zone_name": "West Ronfaure",
   "actor_id": 16785749,
   "actor_name": "Guilloud",
+  "block": 0,
+  "idx": 3,
   "event_id": 33,
-  "offset": 220,
-  "size": 2560,
-  "group": 5,
-  "entities": [16785750, 16785789]
+  "entrypoint": 220,
+  "byte_code": "4220011EF0FFFF7F1D0080231D0180..."
 }
 ```
 
@@ -175,17 +198,21 @@ One row per event. Sort: `(zone_id, actor_id, event_id, offset)`.
 | `zone_name` | string | |
 | `actor_id` | int | Owning entity. Sentinels (`0x7FFFFFC0–0x7FFFFFF9`) kept raw |
 | `actor_name` | string \| null | `null` for sentinels and zone-level scripts |
-| `event_id` | int | Signed 16-bit. `-1` = `0xFFFF` fragment, `-2` = `0xFFFE`, etc. |
-| `offset` | int | Byte offset within the actor's bytecode where this event starts |
-| `size` | int | Byte length of this event's code window |
-| `group` | int | Connected-component ID within the actor. Events sharing code via CALL/GOTO/fall-through share a group |
-| `entities` | int[] | Real entity IDs referenced from reachable code. Filtered: no sentinels, no values from data sections. Sorted ascending |
+| `block` | int | Zero-based block ordinal for this `(zone_id, actor_id)`. Most actors have one block (`0`). A few zones (e.g. Aht Urhgan Whitegate phases) ship multiple event DATs that share an `actor_id` — each block has its own bytecode/imed |
+| `idx` | int | Zero-based position within this block's events list. Disambiguates events that share an `event_id` (~47% of actors have duplicates) |
+| `event_id` | int | Signed 16-bit. `-1` = `0xFFFF` fragment, `-2` = `0xFFFE`, etc. **Not unique within a block.** |
+| `entrypoint` | int | Byte offset within the actor block's concatenated bytecode region where this event's `byte_code` starts. Branch operands inside `byte_code` are absolute in that frame — disassemblers must rebase via `entrypoint` |
+| `byte_code` | string | Hex string. The full bytecode slice for this single event (no `0x` prefix) |
+
+Primary key: `(zone_id, actor_id, block, idx)`.
+
+Primary key: `(zone_id, actor_id, idx)`.
 
 ---
 
 ## events_actors.ndjson.gz
 
-One row per actor block. Carries the bytecode and imed_data table. Sort: `(zone_id, actor_id)`.
+One row per actor block. Sort: `(zone_id, actor_id)`. Schema version 2.
 
 ```json
 {
@@ -193,7 +220,7 @@ One row per actor block. Carries the bytecode and imed_data table. Sort: `(zone_
   "zone_name": "West Ronfaure",
   "actor_id": 16785749,
   "actor_name": "Guilloud",
-  "bytecode": "320045...",
+  "block": 0,
   "imed_data": [7481, 0, 1, 2, 3, 4, 5, 6]
 }
 ```
@@ -204,8 +231,10 @@ One row per actor block. Carries the bytecode and imed_data table. Sort: `(zone_
 | `zone_name` | string | |
 | `actor_id` | int | |
 | `actor_name` | string \| null | Resolved from entities lookup |
-| `bytecode` | string | Hex string. The full event_data region for this actor — events index into it via `offset` |
-| `imed_data` | int[] | Per-actor immediate data. Opcode args in `0x8000–0x8FFF` index into this |
+| `block` | int | Zero-based block ordinal for this `(zone_id, actor_id)`. Same semantics as on `events` |
+| `imed_data` | int[] | Immediate data table for this block. Opcode args in `0x8000–0x8FFF` index into this |
+
+Primary key: `(zone_id, actor_id, block)`.
 
 ---
 
@@ -289,11 +318,17 @@ One row per ability or weapon skill. Sort: `(id)`.
 
 ## events_scripts.parquet
 
-One row per event. The `lua` column holds decompiled Lua source produced via [xi-decompile](https://github.com/sruon/xi-decompile-py). Sort: `(zone_id, actor_id, event_id)`.
+One row per event. The `lua` column holds decompiled Lua source, and `entities` is the reverse-index list of entity IDs referenced by reachable instructions. Both produced via [xi-events-py](https://github.com/sruon/xi-events-py). Sort: `(zone_id, actor_id, block, idx)`.
 
 ```
-zone_id, zone_name, actor_id, actor_name, event_id, lua
+zone_id, zone_name, actor_id, actor_name, block, idx, event_id, entities, lua
 ```
+
+| Field | Type | Notes |
+|---|---|---|
+| `block`, `idx`, `event_id` | int | Same semantics as `events.parquet`. Primary key: `(zone_id, actor_id, block, idx)` |
+| `entities` | int[] | Entity IDs referenced by reachable instructions (sentinels filtered, sorted ascending). Useful as a reverse index — `WHERE list_contains(entities, X)` |
+| `lua` | string | Decompiled Lua source |
 
 ```lua
 function event_2(npc, player, params)

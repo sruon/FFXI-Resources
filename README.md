@@ -2,9 +2,15 @@
 
 Automated FFXI DAT file parser. Publishes versioned releases on each client update.
 
+## Credits
+- InoUno for [xi-tinkerer](https://github.com/InoUno/xi-tinkerer), used to parse efficiently many DAT files
+- atom0s for [XiEvents](https://github.com/atom0s/XiEvents), used to decomp events and various DAT related snippets
+- The Windower team for [ResourceExtractor](https://github.com/Windower/ResourceExtractor) and [POLUtils](https://github.com/Windower/POLUtils) for general DAT parsing knowledge
+
 ## Local development
 
-Requires Python 3.11+. Wheels are pulled from GitHub Releases — no Rust toolchain needed.
+Requires Python 3.11+. 
+Integration with `xi-tinkerer` goes through pre-built wheels but you may need a Rust toolchain if they don't work.
 
 ```sh
 pip install -e .
