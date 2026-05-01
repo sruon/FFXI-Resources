@@ -58,7 +58,10 @@ class ItemDumper(DumpScript):
             icon_b64 = full.get("icon")
             full["icon"] = base64.b64decode(icon_b64) if icon_b64 else None
             wide_rows.append(full)
-        write_parquet(wide_rows, os.path.join(output_dir, "items.parquet"))
+        write_parquet(
+            wide_rows, os.path.join(output_dir, "items.parquet"),
+            sort_by=["id"], row_group_size=5_000,
+        )
 
         write_schema(AnyItem, os.path.join(output_dir, "items.schema.json"))
 

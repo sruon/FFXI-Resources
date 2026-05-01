@@ -257,7 +257,12 @@ class EventDumper(DumpScript):
             pa.field("uses_result2", pa.bool_()),
             pa.field("imed", pa.map_(pa.int32(), imed_value_struct)),
         ])
-        write_parquet(events_rows, os.path.join(output_dir, "events.parquet"), schema=events_schema)
+        write_parquet(
+            events_rows, os.path.join(output_dir, "events.parquet"),
+            schema=events_schema,
+            sort_by=["zone_id", "actor_id", "block", "idx"],
+            row_group_size=25_000,
+        )
 
 
 if __name__ == "__main__":

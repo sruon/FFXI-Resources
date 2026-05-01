@@ -68,7 +68,10 @@ class EntityDumper(DumpScript):
 
         meta = {"version": version, "schema_version": 1}
         write_ndjson_gz(rows, os.path.join(output_dir, "entities.ndjson.gz"), meta=meta)
-        write_parquet(rows, os.path.join(output_dir, "entities.parquet"))
+        write_parquet(
+            rows, os.path.join(output_dir, "entities.parquet"),
+            sort_by=["zone_id", "entity_id"], row_group_size=10_000,
+        )
 
 
 if __name__ == "__main__":
