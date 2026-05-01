@@ -26,11 +26,9 @@ Both contain the same data. NDJSON has a sidecar `<name>.meta.json` with `versio
 | `entities.{ndjson.gz,parquet}` | Entity names (one entity per row) |
 | `zones.{ndjson.gz,parquet}` | Zone names — long, alt (abbreviated), short (one zone per row) |
 | `autotranslate.{ndjson.gz,parquet}` | Auto-translate phrases (one entry per row) |
-| `events.{ndjson.gz,parquet}` | Event records (one event per row) |
-| `events_actors.{ndjson.gz,parquet}` | Actor blocks with bytecode + imed_data |
+| `events.{ndjson.gz,parquet}` | Event records — bytecode, decompiled Lua, and static analysis per event |
 | `spells.{ndjson.gz,parquet}` | Spells (one spell per row) |
 | `abilities.{ndjson.gz,parquet}` | Abilities + weapon skills (one per row) |
-| `events_scripts.parquet` | Event bytecode decompiled to Lua (one per event) |
 
 Plus a `<name>.meta.json` for each `.ndjson.gz`:
 
@@ -170,9 +168,11 @@ One row per phrase. Sort: `(category_name, entry_id)`.
 
 ---
 
-## events.ndjson.gz
+## events.ndjson.gz / events.parquet
 
-One row per event. Sort: `(zone_id, actor_id, idx)`. Schema version 2.
+One row per event. Sort: `(zone_id, actor_id, block, idx)`. Schema version 3.
+
+Single self-contained file: raw bytecode, decompiled Lua, and static-analysis fields are all on the same row. Bytecode is per-event (no shared address space across events). Fragments (`event_id < 0`, ~71% of rows) carry bytecode but no Lua / analysis — fields are `null` / `[]` / `false` / `{}` for those.
 
 ```json
 {
@@ -183,50 +183,39 @@ One row per event. Sort: `(zone_id, actor_id, idx)`. Schema version 2.
   "idx": 3,
   "event_id": 33,
   "entrypoint": 220,
-  "byte_code": "4220011EF0FFFF7F1D0080231D0180..."
+  "byte_code": "4220011EF0FFFF7F1D0080231D0180...",
+  "lua": "function event_33(npc, player, params)\n    ...\nend\n",
+  "params": [0, 4, 5],
+  "state": [10, 64],
+  "scratch": [29, 30],
+  "string_refs": [7468, 7469],
+  "entities": [16785750, 16785789],
+  "uses_result": true,
+  "uses_result2": false,
+  "imed": {"0": {"kind": "string", "value": 7468}, "1": {"kind": "string", "value": 7469}}
 }
 ```
+
+Primary key: `(zone_id, actor_id, block, idx)`.
 
 | Field | Type | Notes |
 |---|---|---|
 | `zone_id` | int | Join against `zones.parquet` for the human-readable name |
 | `actor_id` | int | Owning entity. Sentinels (`0x7FFFFFC0–0x7FFFFFF9`) kept raw |
 | `actor_name` | string \| null | `null` for sentinels and zone-level scripts |
-| `block` | int | Zero-based block ordinal for this `(zone_id, actor_id)`. Most actors have one block (`0`). A few zones (e.g. Aht Urhgan Whitegate phases) ship multiple event DATs that share an `actor_id` — each block has its own bytecode/imed |
+| `block` | int | Zero-based block ordinal for this `(zone_id, actor_id)`. A few zones (e.g. Aht Urhgan Whitegate phases) ship multiple event DATs that share an `actor_id` — each block has its own bytecode/imed |
 | `idx` | int | Zero-based position within this block's events list. Disambiguates events that share an `event_id` (~47% of actors have duplicates) |
-| `event_id` | int | Signed 16-bit. `-1` = `0xFFFF` fragment, `-2` = `0xFFFE`, etc. **Not unique within a block.** |
+| `event_id` | int | Signed 16-bit. `-1` = `0xFFFF` fragment, `-2` = `0xFFFE`, etc. **Not unique within a block.** Fragments don't get decompiled |
 | `entrypoint` | int | Byte offset within the actor block's concatenated bytecode region where this event's `byte_code` starts. Branch operands inside `byte_code` are absolute in that frame — disassemblers must rebase via `entrypoint` |
 | `byte_code` | string | Hex string. The full bytecode slice for this single event (no `0x` prefix) |
-
-Primary key: `(zone_id, actor_id, block, idx)`.
-
----
-
-## events_actors.ndjson.gz
-
-One row per actor block. Sort: `(zone_id, actor_id)`. Schema version 2.
-
-```json
-{
-  "zone_id": 100,
-  "actor_id": 16785749,
-  "actor_name": "Guilloud",
-  "block": 0,
-  "imed_data": [7481, 0, 1, 2, 3, 4, 5, 6]
-}
-```
-
-| Field | Type | Notes |
-|---|---|---|
-| `zone_id` | int | Join against `zones.parquet` for the human-readable name |
-| `actor_id` | int | |
-| `actor_name` | string \| null | Resolved from entities lookup |
-| `block` | int | Zero-based block ordinal for this `(zone_id, actor_id)`. Same semantics as on `events` |
-| `imed_data` | int[] | Immediate data table for this block. Opcode args in `0x8000–0x8FFF` index into this |
-
-Primary key: `(zone_id, actor_id, block)`.
-
----
+| `lua` | string \| null | Decompiled Lua source produced via [xi-events-py](https://github.com/sruon/xi-events-py). `null` for fragments |
+| `params` | int[] | Indices into `params[]` region this event reads/writes |
+| `state` | int[] | State-region addresses touched (excluding result/result2) |
+| `scratch` | int[] | Scratch-region addresses touched |
+| `string_refs` | int[] | Sorted, deduped `string_id`s referenced. Join against `strings.parquet` |
+| `entities` | int[] | Sorted, deduped real entity IDs referenced (sentinels filtered). Useful as a reverse index — `WHERE list_contains(entities, X)` |
+| `uses_result` / `uses_result2` | bool | Whether the event reads/writes the `result` / `result2` slot |
+| `imed` | map\<int, struct\<kind: string, value: int\>\> | Sparse: only slots this event consumes. `kind` ∈ `{string, item, ticks, ascii, bit}`. `value` is the resolved value already pulled from the actor's imed table — no join needed |
 
 ---
 
@@ -306,33 +295,6 @@ One row per ability or weapon skill. Sort: `(id)`.
 
 ---
 
-## events_scripts.parquet
-
-One row per event. The `lua` column holds decompiled Lua source, and `entities` is the reverse-index list of entity IDs referenced by reachable instructions. Both produced via [xi-events-py](https://github.com/sruon/xi-events-py). Sort: `(zone_id, actor_id, block, idx)`.
-
-```
-zone_id, actor_id, actor_name, block, idx, event_id, entities, lua
-```
-
-| Field | Type | Notes |
-|---|---|---|
-| `block`, `idx`, `event_id` | int | Same semantics as `events.parquet`. Primary key: `(zone_id, actor_id, block, idx)` |
-| `entities` | int[] | Entity IDs referenced by reachable instructions (sentinels filtered, sorted ascending). Useful as a reverse index — `WHERE list_contains(entities, X)` |
-| `lua` | string | Decompiled Lua source |
-
-```lua
-function event_2(npc, player, params)
-    npc:lookAtAndTalk(player)
-    npc:say(7428)  -- This barge is currently en route to [South Landing via Newtpool/...
-    player:waitForKeypress()
-    ...
-end
-```
-
-Parquet-only — Lua text is too verbose for NDJSON to be practical.
-
----
-
 ## DuckDB usage
 
 Parquet is preferred — typed columns, predicate pushdown, no parsing overhead:
@@ -340,15 +302,19 @@ Parquet is preferred — typed columns, predicate pushdown, no parsing overhead:
 ```sql
 -- Load Parquet directly
 CREATE TABLE events AS SELECT * FROM 'events.parquet';
-CREATE TABLE actors AS SELECT * FROM 'events_actors.parquet';
 
 -- Reverse lookup: events involving a specific entity
-SELECT * FROM events WHERE list_contains(entities, 16785750) OR actor_id = 16785750;
+SELECT zone_id, actor_id, event_id, lua
+FROM events WHERE list_contains(entities, 16785750) OR actor_id = 16785750;
 
--- Get bytecode for a specific event
-SELECT a.bytecode, e.offset, e.size
-FROM events e JOIN actors a USING (zone_id, actor_id)
-WHERE e.zone_id = 100 AND e.actor_id = 16785749 AND e.event_id = 33;
+-- Get bytecode + decompiled Lua for a specific event
+SELECT byte_code, lua
+FROM events
+WHERE zone_id = 100 AND actor_id = 16785749 AND block = 0 AND idx = 3;
+
+-- Find all events that read a specific string
+SELECT zone_id, actor_id, event_id
+FROM events WHERE list_contains(string_refs, 7468);
 
 -- Items: query into category-specific fields (struct columns)
 SELECT id, name.english, weapon.damage, weapon.delay
