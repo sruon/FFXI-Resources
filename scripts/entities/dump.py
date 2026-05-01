@@ -60,7 +60,6 @@ class EntityDumper(DumpScript):
             for e in zone["entities"]:
                 rows.append({
                     "zone_id": zone["id"],
-                    "zone_name": zone["name"],
                     "entity_id": e["id"],
                     "name": e["name"],
                 })

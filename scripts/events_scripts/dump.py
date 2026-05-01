@@ -23,7 +23,7 @@ class EventScriptDumper(DumpScript):
         rows = []
         failed = 0
 
-        for zone_id, actor_id, block, idx, event_id, zone_name in ds.iter_events():
+        for zone_id, actor_id, block, idx, event_id, _zone_name in ds.iter_events():
             ev_rec = ds.events.get((zone_id, actor_id, block, idx), {})
             actor_name = ev_rec.get("actor_name")
             lua = None
@@ -39,7 +39,6 @@ class EventScriptDumper(DumpScript):
 
             rows.append({
                 "zone_id": zone_id,
-                "zone_name": zone_name,
                 "actor_id": actor_id,
                 "actor_name": actor_name,
                 "block": block,

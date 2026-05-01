@@ -75,7 +75,6 @@ class StringDumper(DumpScript):
             for s in zone["strings"]:
                 rows.append({
                     "zone_id": zone["id"],
-                    "zone_name": zone["name"],
                     "string_id": s["id"],
                     "content": s["content"],
                 })

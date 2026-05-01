@@ -93,7 +93,6 @@ One row per zone string. Sort: `(zone_id, string_id)`.
 ```json
 {
   "zone_id": 100,
-  "zone_name": "West Ronfaure",
   "string_id": 42,
   "content": "Welcome, traveler."
 }
@@ -101,8 +100,7 @@ One row per zone string. Sort: `(zone_id, string_id)`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `zone_id` | int | |
-| `zone_name` | string | |
+| `zone_id` | int | Join against `zones.parquet` for the human-readable name |
 | `string_id` | int | Index within the zone's string DAT |
 | `content` | string | Cleaned text (control codes resolved) |
 
@@ -115,7 +113,6 @@ One row per entity. Sort: `(zone_id, entity_id)`.
 ```json
 {
   "zone_id": 230,
-  "zone_name": "Southern San d'Oria",
   "entity_id": 17104897,
   "name": "Valaineral R Davilles"
 }
@@ -123,8 +120,7 @@ One row per entity. Sort: `(zone_id, entity_id)`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `zone_id` | int | |
-| `zone_name` | string | |
+| `zone_id` | int | Join against `zones.parquet` for the human-readable name |
 | `entity_id` | int | Server-side entity ID |
 | `name` | string | Empty string preserved as-is |
 
@@ -181,7 +177,6 @@ One row per event. Sort: `(zone_id, actor_id, idx)`. Schema version 2.
 ```json
 {
   "zone_id": 100,
-  "zone_name": "West Ronfaure",
   "actor_id": 16785749,
   "actor_name": "Guilloud",
   "block": 0,
@@ -194,8 +189,7 @@ One row per event. Sort: `(zone_id, actor_id, idx)`. Schema version 2.
 
 | Field | Type | Notes |
 |---|---|---|
-| `zone_id` | int | |
-| `zone_name` | string | |
+| `zone_id` | int | Join against `zones.parquet` for the human-readable name |
 | `actor_id` | int | Owning entity. Sentinels (`0x7FFFFFC0–0x7FFFFFF9`) kept raw |
 | `actor_name` | string \| null | `null` for sentinels and zone-level scripts |
 | `block` | int | Zero-based block ordinal for this `(zone_id, actor_id)`. Most actors have one block (`0`). A few zones (e.g. Aht Urhgan Whitegate phases) ship multiple event DATs that share an `actor_id` — each block has its own bytecode/imed |
@@ -206,8 +200,6 @@ One row per event. Sort: `(zone_id, actor_id, idx)`. Schema version 2.
 
 Primary key: `(zone_id, actor_id, block, idx)`.
 
-Primary key: `(zone_id, actor_id, idx)`.
-
 ---
 
 ## events_actors.ndjson.gz
@@ -217,7 +209,6 @@ One row per actor block. Sort: `(zone_id, actor_id)`. Schema version 2.
 ```json
 {
   "zone_id": 100,
-  "zone_name": "West Ronfaure",
   "actor_id": 16785749,
   "actor_name": "Guilloud",
   "block": 0,
@@ -227,8 +218,7 @@ One row per actor block. Sort: `(zone_id, actor_id)`. Schema version 2.
 
 | Field | Type | Notes |
 |---|---|---|
-| `zone_id` | int | |
-| `zone_name` | string | |
+| `zone_id` | int | Join against `zones.parquet` for the human-readable name |
 | `actor_id` | int | |
 | `actor_name` | string \| null | Resolved from entities lookup |
 | `block` | int | Zero-based block ordinal for this `(zone_id, actor_id)`. Same semantics as on `events` |
@@ -321,7 +311,7 @@ One row per ability or weapon skill. Sort: `(id)`.
 One row per event. The `lua` column holds decompiled Lua source, and `entities` is the reverse-index list of entity IDs referenced by reachable instructions. Both produced via [xi-events-py](https://github.com/sruon/xi-events-py). Sort: `(zone_id, actor_id, block, idx)`.
 
 ```
-zone_id, zone_name, actor_id, actor_name, block, idx, event_id, entities, lua
+zone_id, actor_id, actor_name, block, idx, event_id, entities, lua
 ```
 
 | Field | Type | Notes |

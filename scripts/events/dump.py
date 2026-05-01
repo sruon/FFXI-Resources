@@ -103,7 +103,7 @@ class EventDumper(DumpScript):
         events_rows = []
         actors_rows = []
         for zone in zone_data:
-            zid, zname = zone["id"], zone["name"]
+            zid = zone["id"]
             block_counter: dict[int, int] = {}
             for block in sorted(zone["blocks"], key=lambda b: b["entity_id"]):
                 actor_id = block["entity_id"]
@@ -112,7 +112,6 @@ class EventDumper(DumpScript):
                 block_counter[actor_id] = block_idx + 1
                 actors_rows.append({
                     "zone_id": zid,
-                    "zone_name": zname,
                     "actor_id": actor_id,
                     "actor_name": actor_name,
                     "block": block_idx,
@@ -123,7 +122,6 @@ class EventDumper(DumpScript):
                     byte_code = _strip_hex_prefix(ev["byte_code"])
                     events_rows.append({
                         "zone_id": zid,
-                        "zone_name": zname,
                         "actor_id": actor_id,
                         "actor_name": actor_name,
                         "block": block_idx,
