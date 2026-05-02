@@ -261,7 +261,7 @@ class EventDumper(DumpScript):
             events_rows, os.path.join(output_dir, "events.parquet"),
             schema=events_schema,
             sort_by=["zone_id", "actor_id", "block", "idx"],
-            row_group_size=25_000,
+            row_group_size=5_000,
         )
 
 

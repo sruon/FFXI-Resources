@@ -60,7 +60,7 @@ class ItemDumper(DumpScript):
             wide_rows.append(full)
         write_parquet(
             wide_rows, os.path.join(output_dir, "items.parquet"),
-            sort_by=["id"], row_group_size=5_000,
+            sort_by=["id"], row_group_size=2_500,
         )
 
         write_schema(AnyItem, os.path.join(output_dir, "items.schema.json"))

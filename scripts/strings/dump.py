@@ -85,7 +85,7 @@ class StringDumper(DumpScript):
         write_ndjson_gz(rows, os.path.join(output_dir, "strings.ndjson.gz"), meta=meta)
         write_parquet(
             rows, os.path.join(output_dir, "strings.parquet"),
-            sort_by=["zone_id", "string_id"], row_group_size=100_000,
+            sort_by=["zone_id", "string_id"], row_group_size=25_000,
         )
 
 
