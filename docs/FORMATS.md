@@ -361,10 +361,14 @@ Stat modifier display names. Sort: `(id)`.
 
 ## merits.ndjson.gz / merits.parquet
 
-Merit names. Sort: `(id)`.
+Merit names + descriptions. The DAT stores name on the even ID and description on the next odd ID; this dumper pairs them and drops devname placeholders. Sort: `(id)`.
 
 ```json
-{"id": 100, "name": "MeripoName50"}
+{
+  "id": 644,
+  "name": "Ice Magic Accuracy",
+  "description": "Increase the accuracy of Ice spells by 3."
+}
 ```
 
 ---
