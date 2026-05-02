@@ -18,6 +18,8 @@ jobs:
         with:
           python-version: '3.11'
 
+      # Always pull the latest xi-events HEAD even if pip has a cached wheel for the URL
+      - run: pip install --no-cache-dir --upgrade --force-reinstall --no-deps git+https://github.com/sruon/xi-events-py.git
       - run: pip install -e .
 
       - name: Build DAT file list
