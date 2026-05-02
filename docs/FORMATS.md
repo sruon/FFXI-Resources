@@ -26,6 +26,7 @@ Both contain the same data. NDJSON has a sidecar `<name>.meta.json` with `versio
 | `entities.{ndjson.gz,parquet}` | Entity names (one entity per row) |
 | `zones.{ndjson.gz,parquet}` | Zone names — long, alt (abbreviated), short (one zone per row) |
 | `autotranslate.{ndjson.gz,parquet}` | Auto-translate phrases (one entry per row) |
+| `keyitems.{ndjson.gz,parquet}` | Key items (one per row) |
 | `events.{ndjson.gz,parquet}` | Event records — bytecode, decompiled Lua, and static analysis per event |
 | `spells.{ndjson.gz,parquet}` | Spells (one spell per row) |
 | `abilities.{ndjson.gz,parquet}` | Abilities + weapon skills (one per row) |
@@ -143,6 +144,31 @@ One row per zone. Sort: `(id)`.
 | `name` | string | Full name (from `ROM/165/84.DAT`) |
 | `name_alt` | string | Abbreviated name (from `ROM/165/83.DAT`) |
 | `name_short` | string | Short name (from `ROM/165/85.DAT`) |
+
+---
+
+## keyitems.ndjson.gz
+
+One row per key item. Sort: `(id)`.
+
+```json
+{
+  "id": 100,
+  "icon_id": 111,
+  "category": 2,
+  "name": "moon crystal",
+  "name_plural": "moon crystals",
+  "description": "\nThis is needed to pass through\nthe gate that only opens at a certain\ndate and time."
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | int | Key item ID |
+| `icon_id` | int | Icon resource reference |
+| `category` | int | Category number (raw) |
+| `name` / `name_plural` | string | Singular and plural display forms |
+| `description` | string | Full description text |
 
 ---
 
