@@ -30,6 +30,11 @@ Both contain the same data. NDJSON has a sidecar `<name>.meta.json` with `versio
 | `events.{ndjson.gz,parquet}` | Event records — bytecode, decompiled Lua, and static analysis per event |
 | `spells.{ndjson.gz,parquet}` | Spells (one spell per row) |
 | `abilities.{ndjson.gz,parquet}` | Abilities + weapon skills (one per row) |
+| `statuses.{ndjson.gz,parquet}` | Status effects — name, description, flag, icon |
+| `modifiers.{ndjson.gz,parquet}` | Stat modifier names |
+| `merits.{ndjson.gz,parquet}` | Merit names |
+| `augments.{ndjson.gz,parquet}` | Augment template strings |
+| `monster_families.{ndjson.gz,parquet}` | Monster family names (singular + plural) |
 
 Plus a `<name>.meta.json` for each `.ndjson.gz`:
 
@@ -306,16 +311,81 @@ One row per ability or weapon skill. Sort: `(id)`.
 }
 ```
 
+| Field                                | Type     | Notes                                                                                                                                                        |
+|--------------------------------------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `id`                                 | int      | Ability ID                                                                                                                                                   |
+| `name` / `description`               | string   | From DmsgTable (ROM/181/72.DAT, ROM/181/74.DAT)                                                                                                              |
+| `type`                               | string   | Weapon (weaponskill), Job, Trait, Monster, BloodPactRage, BloodPactWard, Corsair, Pet, Scholar, Waltz, Step, Samba, Jig, Flourish1/2/3, Effusion, Rune, etc. |
+| `icon_id`                            | int      |                                                                                                                                                              |
+| `mp_cost` / `tp_cost`                | int      | `tp_cost: -1` means N/A                                                                                                                                      |
+| `range` / `aoe_range` / `area_shape` | string   | Same enum types as spells                                                                                                                                    |
+| `shared_timer_id`                    | int      |                                                                                                                                                              |
+| `valid_targets`                      | string[] |                                                                                                                                                              |
+
+---
+
+## statuses.ndjson.gz / statuses.parquet
+
+One row per status effect. Sort: `(id)`. Joins display names from `StatusNames` with `StatusInfo` (description + icon).
+
+```json
+{
+  "id": 1,
+  "name": "weakness",
+  "name_passive": "weakened",
+  "description": "You have been knocked unconscious.",
+  "flag": 65280,
+  "icon": "<base64 BitmapA bytes>"
+}
+```
+
 | Field | Type | Notes |
 |---|---|---|
-| `id` | int | Ability ID |
-| `name` / `description` | string | From DmsgTable (ROM/181/72.DAT, ROM/181/74.DAT) |
-| `type` | string | Weapon (weaponskill), Job, Trait, Monster, BloodPactRage, BloodPactWard, Corsair, Pet, Scholar, Waltz, Step, Samba, Jig, Flourish1/2/3, Effusion, Rune, etc. |
-| `icon_id` | int | |
-| `mp_cost` / `tp_cost` | int | `tp_cost: -1` means N/A |
-| `range` / `aoe_range` / `area_shape` | string | Same enum types as spells |
-| `shared_timer_id` | int | |
-| `valid_targets` | string[] | |
+| `id` | int | Status effect ID |
+| `name` / `name_passive` | string | Active and passive form (e.g. "stun" / "stunned") |
+| `description` | string | Full description text |
+| `flag` | int | Raw bitfield from StatusInfo |
+| `icon` | string (NDJSON) / bytes (Parquet) | FFXI BitmapA-tagged icon. NDJSON has it base64-encoded, Parquet has raw bytes. Decoded bytes start with `0x91` (BitmapA tag) followed by category/id text and a 32×32 8-bit paletted bitmap |
+
+---
+
+## modifiers.ndjson.gz / modifiers.parquet
+
+Stat modifier display names. Sort: `(id)`.
+
+```json
+{"id": 1, "name": "Main Job: Warrior"}
+```
+
+---
+
+## merits.ndjson.gz / merits.parquet
+
+Merit names. Sort: `(id)`.
+
+```json
+{"id": 100, "name": "MeripoName50"}
+```
+
+---
+
+## augments.ndjson.gz / augments.parquet
+
+Augment template strings (printf-like with control codes the client expands at render time). Sort: `(id)`.
+
+```json
+{"id": 1, "text": "{FIR}%+d "}
+```
+
+---
+
+## monster_families.ndjson.gz / monster_families.parquet
+
+Monster family display names. Sort: `(id)`.
+
+```json
+{"id": 1, "name": "crab", "name_plural": "crabs"}
+```
 
 ---
 
