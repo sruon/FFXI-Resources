@@ -143,6 +143,9 @@ class EventDumper(DumpScript):
                 block_idx = block_counter.get(actor_id, 0)
                 block_counter[actor_id] = block_idx + 1
                 imed_data = list(block["data"])
+                # Concat all event slices in source order — the decompiler uses this to
+                # resolve JUMP_TO_POSITION targets that land in sibling events.
+                block_bytecode = bytes.fromhex("".join(_strip_hex_prefix(e["byte_code"]) for e in block["events"]))
                 entrypoint = 0
                 for idx, ev in enumerate(block["events"]):
                     byte_code = _strip_hex_prefix(ev["byte_code"])
@@ -172,6 +175,7 @@ class EventDumper(DumpScript):
                             strings={},
                             entities=zone_entities,
                             items=items_lookup,
+                            block_bytecode=block_bytecode,
                         )
                         try:
                             lua = decompile(fix, comments=False)
