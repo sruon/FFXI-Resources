@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 import yaml
 from loguru import logger
 
-from parsers.autotranslate import parse_autotranslate
+from xi_tinkerer import parse_auto_translate
 from scripts.base import DumpScript
 from writers.json import write_ndjson_gz
 from writers.parquet import write_parquet
@@ -26,20 +26,21 @@ class AutoTranslateDumper(DumpScript):
         return [self.spec[k] for k in ("en", "ja") if k in self.spec]
 
     def dump(self, version: str, base_path: str, output_dir: str):
-        en_path = os.path.join(base_path, self.spec["en"])
-        categories = parse_autotranslate(en_path)
+        data = parse_auto_translate(os.path.join(base_path, self.spec["en"]))
 
         rows = []
-        for cat in categories:
+        for cat in data["categories"]:
+            cat_id = cat["id"]
             for entry in cat.get("entries", []):
+                entry_id = entry["id"]
                 rows.append({
                     "category_name": cat["name"],
-                    "entry_id": entry["id"],
+                    "entry_id": entry_id,
                     "text": entry["text"],
-                    "key": entry["key"],
+                    "key": f"0202{cat_id:02x}{entry_id:02x}",
                 })
 
-        logger.info("Parsed {} auto-translate entries across {} categories", len(rows), len(categories))
+        logger.info("Parsed {} auto-translate entries across {} categories", len(rows), len(data["categories"]))
 
         meta = {"version": version, "schema_version": 1}
         write_ndjson_gz(rows, os.path.join(output_dir, "autotranslate.ndjson.gz"), meta=meta)
