@@ -145,7 +145,8 @@ def format_string(text: str) -> str:
                 result.append("[/")
                 in_selection = True
                 pos = _skip(pos, text, 3)
-            elif sub == 0x85:
+            elif sub in (0x05, 0x85):
+                # 2-byte prefix; bytes that follow (incl. literal `[…]`) are content
                 pos = _skip(pos, text, 2)
             else:
                 pos = _skip(pos, text, 3)

@@ -14,9 +14,9 @@ from writers.parquet import write_parquet
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-class ModifierDumper(DumpScript):
-    """FFXI modifier-name dumper (stat modifier display names)."""
-    produces = ["modifiers"]
+class PankrationDumper(DumpScript):
+    """FFXI Pankration trait/modifier name dumper."""
+    produces = ["pankration"]
 
     def __init__(self):
         with open(os.path.join(SCRIPT_DIR, "dats.yaml")) as f:
@@ -37,15 +37,15 @@ class ModifierDumper(DumpScript):
             rows.append({"id": int(k), "name": name})
 
         rows.sort(key=lambda r: r["id"])
-        logger.info("Parsed {} modifiers", len(rows))
+        logger.info("Parsed {} pankration entries", len(rows))
 
         meta = {"version": version, "schema_version": 1}
-        write_ndjson_gz(rows, os.path.join(output_dir, "modifiers.ndjson.gz"), meta=meta)
+        write_ndjson_gz(rows, os.path.join(output_dir, "pankration.ndjson.gz"), meta=meta)
         write_parquet(
-            rows, os.path.join(output_dir, "modifiers.parquet"),
+            rows, os.path.join(output_dir, "pankration.parquet"),
             sort_by=["id"], row_group_size=1_000,
         )
 
 
 if __name__ == "__main__":
-    ModifierDumper().run()
+    PankrationDumper().run()

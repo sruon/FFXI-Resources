@@ -1,22 +1,6 @@
 """Parse FFXI auto-translate DAT files."""
 
-import re
 import struct
-
-from constants import JOB_NAMES, ZONES
-
-
-def _resolve_refs(text: str) -> str:
-    def _replace(m):
-        prefix = m.group(1)
-        val = int(m.group(2), 16)
-        if prefix == "J":
-            return JOB_NAMES.get(val, m.group(0))
-        if prefix == "A":
-            return ZONES.get(val, m.group(0))
-        return m.group(0)
-
-    return re.sub(r"@([JA])([0-9A-Fa-f]+)", _replace, text)
 
 
 CATEGORY_MARKER_OPEN = b"\x81\x79"
@@ -83,7 +67,6 @@ def parse_autotranslate(file_path: str) -> list[dict]:
                 text = data[p : p + str_len].rstrip(b"\x00").decode("shift_jis")
             except Exception:
                 text = data[p : p + str_len].rstrip(b"\x00").decode("ascii", errors="replace")
-            text = _resolve_refs(text)
             if not text.strip():
                 p += str_len
                 while p < len(data) and data[p] == 0:

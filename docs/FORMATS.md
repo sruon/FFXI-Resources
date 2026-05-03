@@ -31,7 +31,7 @@ Both contain the same data. NDJSON has a sidecar `<name>.meta.json` with `versio
 | `spells.{ndjson.gz,parquet}` | Spells (one spell per row) |
 | `abilities.{ndjson.gz,parquet}` | Abilities + weapon skills (one per row) |
 | `statuses.{ndjson.gz,parquet}` | Status effects — name, description, flag, icon |
-| `modifiers.{ndjson.gz,parquet}` | Stat modifier names |
+| `pankration.{ndjson.gz,parquet}` | Pankration trait/modifier names |
 | `merits.{ndjson.gz,parquet}` | Merit names |
 | `augments.{ndjson.gz,parquet}` | Augment template strings |
 | `monster_families.{ndjson.gz,parquet}` | Monster family names (singular + plural) |
@@ -194,7 +194,7 @@ One row per phrase. Sort: `(category_name, entry_id)`.
 |---|---|---|
 | `category_name` | string | `Greetings`, `Spells`, `Job Abilities`, etc. |
 | `entry_id` | int | Index within category |
-| `text` | string | Resolved text (job/zone refs replaced) |
+| `text` | string | Raw display text. `@J{hex}` (job) and `@A{hex}` (zone) reference markers are preserved as-is for downstream resolvers |
 | `key` | string | 4-byte hex sequence for the wire-format reference |
 
 ---
@@ -349,9 +349,9 @@ One row per status effect. Sort: `(id)`. Joins display names from `StatusNames` 
 
 ---
 
-## modifiers.ndjson.gz / modifiers.parquet
+## pankration.ndjson.gz / pankration.parquet
 
-Stat modifier display names. Sort: `(id)`.
+Pankration trait/modifier names. Sort: `(id)`.
 
 ```json
 {"id": 1, "name": "Main Job: Warrior"}
