@@ -1,0 +1,96 @@
+name: Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: "Comma-separated FFXI versions, or 'all' to read every entry from versions.json"
+        required: true
+        default: 'all'
+      dry_run:
+        description: "Print the resolved version list and exit without running dumpers"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.list.outputs.versions }}
+    steps:
+      - id: list
+        env:
+          INPUT_VERSIONS: ${{ inputs.versions }}
+        run: |
+          if [ "$INPUT_VERSIONS" = "all" ]; then
+            list=$(curl -fsSL https://ffxi-resources.sruon.dev/versions.json \
+              | jq -c '[.versions[].version]')
+          else
+            list=$(echo "$INPUT_VERSIONS" \
+              | tr ',' '\n' \
+              | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+              | jq -Rsc 'split("\n") | map(select(length > 0))')
+          fi
+          echo "Resolved versions: $list"
+          echo "versions=$list" >> "$GITHUB_OUTPUT"
+
+  process:
+    needs: resolve
+    if: ${{ ! inputs.dry_run }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Serialize: upload-r2.yml mutates a single versions.json on R2; parallel
+      # backfills would race on read-modify-write.
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        version: ${{ fromJson(needs.resolve.outputs.versions) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install --no-cache-dir --upgrade --force-reinstall --no-deps git+https://github.com/sruon/xi-events-py.git
+      - run: pip install -e .
+
+      - name: Build DAT file list
+        run: |
+          for script in scripts/*/dump.py; do
+            python3 "$script" list-files
+          done | sort -u > all-dats.txt
+
+      - uses: sruon/ffxi-fetch-action@v1
+        with:
+          files-from: all-dats.txt
+          output-dir: dat
+          version: ${{ matrix.version }}
+        env:
+          BUCKET_KEY_ID: ${{ secrets.BUCKET_KEY_ID }}
+          BUCKET_APP_KEY: ${{ secrets.BUCKET_APP_KEY }}
+
+      - name: Run all dump scripts
+        run: python3 scripts/run_all.py dump --version "${{ matrix.version }}" --base-path dat --output-dir dist
+
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.NOTIFIER_APP_ID }}
+          private-key: ${{ secrets.NOTIFIER_APP_PRIVATE_KEY }}
+
+      - name: Replace release (delete + recreate so upload-r2 fires)
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ matrix.version }}
+        run: |
+          gh release delete "$VERSION" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --notes "Automated dump for FFXI version $VERSION (backfill)" \
+            dist/*
