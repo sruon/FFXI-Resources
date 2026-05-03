@@ -7,6 +7,10 @@ on:
         description: "Comma-separated FFXI versions, or 'all' to read every entry from versions.json"
         required: true
         default: 'all'
+      max_parallel:
+        description: "How many versions to process in parallel"
+        required: false
+        default: '6'
       dry_run:
         description: "Print the resolved version list and exit without running dumpers"
         type: boolean
@@ -21,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       versions: ${{ steps.list.outputs.versions }}
+      count: ${{ steps.list.outputs.count }}
     steps:
       - id: list
         env:
@@ -35,17 +40,22 @@ jobs:
               | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
               | jq -Rsc 'split("\n") | map(select(length > 0))')
           fi
-          echo "Resolved versions: $list"
+          count=$(echo "$list" | jq 'length')
+          echo "Resolved $count versions: $list"
           echo "versions=$list" >> "$GITHUB_OUTPUT"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
 
   process:
     needs: resolve
-    if: ${{ ! inputs.dry_run }}
+    if: ${{ ! inputs.dry_run && needs.resolve.outputs.count != '0' }}
     runs-on: ubuntu-latest
+    env:
+      ENDPOINT: https://5ab2e190b7cfef75dcbfebcf15b14352.r2.cloudflarestorage.com
+      BUCKET: ffxi-resources
+      R2_KEY_ID: ${{ secrets.RESOURCES_BUCKET_KEY_ID }}
+      R2_APP_KEY: ${{ secrets.RESOURCES_BUCKET_APP_KEY }}
     strategy:
-      # Serialize: upload-r2.yml mutates a single versions.json on R2; parallel
-      # backfills would race on read-modify-write.
-      max-parallel: 1
+      max-parallel: ${{ fromJson(inputs.max_parallel) }}
       fail-fast: false
       matrix:
         version: ${{ fromJson(needs.resolve.outputs.versions) }}
@@ -77,6 +87,9 @@ jobs:
       - name: Run all dump scripts
         run: python3 scripts/run_all.py dump --version "${{ matrix.version }}" --base-path dat --output-dir dist
 
+      - name: Upload version artifacts to R2 (no index touch — done after matrix)
+        run: python3 scripts/r2_upload.py upload-version "${{ matrix.version }}" dist
+
       - name: Generate app token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -84,13 +97,41 @@ jobs:
           app-id: ${{ secrets.NOTIFIER_APP_ID }}
           private-key: ${{ secrets.NOTIFIER_APP_PRIVATE_KEY }}
 
-      - name: Replace release (delete + recreate so upload-r2 fires)
+      - name: Replace GitHub release
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ matrix.version }}
+        # Skip the upload-r2 trigger by tagging the release notes; we already
+        # uploaded the artifacts inline. The release: published event will fire
+        # upload-r2.yml anyway, but it'll just re-upload the same bytes and run
+        # rebuild-index — harmless.
         run: |
           gh release delete "$VERSION" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$VERSION" \
             --title "$VERSION" \
             --notes "Automated dump for FFXI version $VERSION (backfill)" \
             dist/*
+
+  finalize:
+    needs: process
+    if: ${{ ! inputs.dry_run }}
+    runs-on: ubuntu-latest
+    env:
+      ENDPOINT: https://5ab2e190b7cfef75dcbfebcf15b14352.r2.cloudflarestorage.com
+      BUCKET: ffxi-resources
+      R2_KEY_ID: ${{ secrets.RESOURCES_BUCKET_KEY_ID }}
+      R2_APP_KEY: ${{ secrets.RESOURCES_BUCKET_APP_KEY }}
+    concurrency:
+      group: r2-index-rebuild
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install -q boto3
+
+      - name: Rebuild versions.json from bucket listing
+        run: python3 scripts/r2_upload.py rebuild-index
