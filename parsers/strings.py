@@ -13,23 +13,36 @@ StringDatHeader = cs.Struct(
     "first_offset_raw" / cs.Int32ul,
 )
 
-# Control codes that insert a placeholder character
-_PLACEHOLDER_CODES = {
-    0x08: "%",
-    0x11: "%",
-    0x1C: "%",
-    0x05: "%",
+# Control byte → semantic placeholder. Mapping mirrors POLUtils'
+# SimpleStringTableEntry / DialogTableEntry parsers, which is the canonical
+# definition of FFXI's text format (see github.com/Windower/POLUtils).
+#
+# value = (placeholder_text, total_byte_length_including_control_byte)
+_SEMANTIC_CODES = {
+    0x08: ("<player>", 1),     # Player Name
+    0x09: ("<name>", 1),       # Speaker Name (NPC)
+    0x0A: ("<number>", 2),     # Numeric Parameter (+ 1B param)
+    0x0E: ("<number>", 1),     # Variant numeric placeholder
+    0x11: ("<player>", 1),     # Possible Special Code: 11 — used for player/trust names
+    0x19: ("<item>", 2),       # Item Parameter (+ 1B param)
+    0x1A: ("<keyitem>", 2),    # Key Item Parameter (+ 1B param)
+    0x1C: ("<player>", 2),     # Player/Chocobo Parameter (+ 1B param)
 }
 
-# Control codes silently skipped (byte lengths including the code byte)
-_SKIP_CODES = {
-    0x09: 1,
-    0x0B: 1,
-    0x0C: 2,
-    0x19: 2,
-    0x1A: 2,
-    0x1F: 2,
+# Control bytes that consume a fixed number of bytes and emit nothing.
+_SILENT_CODES = {
+    0x0B: 1,    # Selection Dialog open marker
+    0x0C: 2,    # Multiple Choice (Parameter) — literal '[…]' follows
+    0x1E: 2,    # Set Color
+    0x1F: 2,    # Unknown
+    0xEF: 2,
+    0xFD: 6,
 }
+
+# Generic '%' placeholder for control bytes whose semantics POLUtils labels
+# as "Possible Special Code" — these become a generic substitution after
+# UpdateExtractor's sanitization, and we follow suit.
+_GENERIC_PERCENT_CODES = {0x05}
 
 
 def parse_string_dat(file_path: str | Path, encoding: str = "utf-8") -> ParsedStringDat:
@@ -97,7 +110,17 @@ def _skip(pos: int, text: str, n: int) -> int:
 
 
 def format_string(text: str) -> str:
-    """Strip FFXI control codes, insert readable placeholders."""
+    """Strip FFXI control codes, insert LSB-style placeholders.
+
+    Byte→annotation mapping replicates POLUtils SimpleStringTableEntry.cs.
+    Output uses the same placeholder vocabulary as LSB IDs.lua text comments
+    (`<item>`, `<keyitem>`, `<player>`, `<name>`, `<number>`).
+
+    The 0x7F 0x00 0x01 0x01 0x05 <id4> 0x00 substitution sequence (used in
+    "Obtained: <item>." style strings) doesn't tag item-vs-keyitem in the
+    bytes — POLUtils itself can't distinguish — so it falls through to '%'.
+    LSB's curated tag for those rows is recoverable only via context.
+    """
     result = []
     pos = 0
     in_selection = False
@@ -106,6 +129,7 @@ def format_string(text: str) -> str:
         b = ord(text[pos])
 
         if b == 0x07:
+            # 0x07 is line-break / ordinal marker / selection separator
             if pos + 1 < len(text) and ord(text[pos + 1]) == 0x32:
                 if pos + 3 < len(text) and text[pos + 2 : pos + 4] == "nd":
                     result.append(" ")
@@ -122,36 +146,32 @@ def format_string(text: str) -> str:
                 result.append("/" if in_selection else " ")
                 pos += 1
 
-        elif b == 0x0A:
-            result.append("#")
-            pos = _skip(pos, text, 2)
-
-        elif b == 0x1E:
-            pos = _skip(
-                pos,
-                text,
-                3 if pos + 1 < len(text) and ord(text[pos + 1]) == 0x1F else 2,
-            )
-
         elif b == 0x7F:
+            # POLUtils 0x7F dispatch (see DialogTableEntry / SimpleStringTableEntry)
             if pos + 1 >= len(text):
                 pos += 1
                 continue
             sub = ord(text[pos + 1])
-            if sub == 0x31:
+            if sub == 0x31:                      # Prompt / N-Second Delay (3B)
                 in_selection = False
                 pos = _skip(pos, text, 3)
-            elif sub == 0x92:
+            elif sub == 0x92:                    # Singular/Plural Choice (3B)
                 result.append("[/")
                 in_selection = True
                 pos = _skip(pos, text, 3)
-            elif sub in (0x05, 0x85):
-                # 2-byte prefix; bytes that follow (incl. literal `[…]`) are content
+            elif sub in (0x05, 0x85):            # Gender open / "Possible Special Code: 05" (2B)
                 pos = _skip(pos, text, 2)
+            elif sub in (0x8D, 0x8E, 0xB1):      # Weather / Title (3B)
+                pos = _skip(pos, text, 3)
             else:
                 pos = _skip(pos, text, 3)
 
         elif b == 0x01:
+            # 0x01..0x02 is a generic entity-ref substitution. The actual
+            # semantic type at this byte sequence varies by game context
+            # (LSB tags it as <item>, <keyitem>, <player>, or <name> case
+            # by case) — not derivable from bytes alone. Emit '%' as the
+            # ambiguous placeholder.
             found = False
             for j in range(pos + 1, min(pos + 14, len(text))):
                 if ord(text[j]) == 0x02:
@@ -161,41 +181,28 @@ def format_string(text: str) -> str:
                     found = True
                     break
             if not found:
-                # 0x01 has two roles depending on what precedes it:
-                #   - after a placeholder code (0x05/0x08/0x0A/0x11/0x1C):
-                #     it's a 1-byte format marker; the next byte is a
-                #     literal punctuation char to keep (e.g. "%!" comes
-                #     from 0x11 0x01 0x21).
-                #   - elsewhere: it's a 2-byte control prefix; the next
-                #     byte is a parameter that must be consumed too (e.g.
-                #     0x01 0x60 between two numbers, 0x01 0x1A before
-                #     "The Wyrm God").
                 prev = ord(text[pos - 1]) if pos > 0 else 0
                 if prev in (0x05, 0x08, 0x0A, 0x11, 0x1C):
                     pos += 1
                 else:
                     pos += 2
 
-        elif b == 0x05:
+        elif b in _SEMANTIC_CODES:
+            placeholder, length = _SEMANTIC_CODES[b]
+            result.append(placeholder)
+            pos = _skip(pos, text, length)
+
+        elif b in _GENERIC_PERCENT_CODES:
             result.append("%")
             pos += 1
-            while pos < len(text) and 0x20 <= ord(text[pos]) < 0x7F:
-                pos += 1
 
-        elif b in _PLACEHOLDER_CODES:
-            result.append(_PLACEHOLDER_CODES[b])
-            pos = _skip(pos, text, 2 if b == 0x1C else 1)
+        elif b in _SILENT_CODES:
+            pos = _skip(pos, text, _SILENT_CODES[b])
 
-        elif b in _SKIP_CODES:
-            pos = _skip(pos, text, _SKIP_CODES[b])
-
-        elif b == 0xEF:
-            pos = _skip(pos, text, 2)
-        elif b == 0xFD:
-            pos = _skip(pos, text, 6)
         elif 0x20 <= b < 0x7F:
             result.append(text[pos])
             pos += 1
+
         else:
             pos += 1
 
