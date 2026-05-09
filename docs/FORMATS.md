@@ -93,11 +93,12 @@ Discriminated union via `category`. Sort: `(id)`. Schema also published as `item
 
 ## strings.ndjson.gz
 
-One row per zone string. Sort: `(zone_id, string_id)`.
+One row per zone string. Sort: `(zone_id, block, string_id)`. Schema version 2.
 
 ```json
 {
   "zone_id": 100,
+  "block": 0,
   "string_id": 42,
   "content": "Welcome, traveler."
 }
@@ -106,8 +107,11 @@ One row per zone string. Sort: `(zone_id, string_id)`.
 | Field | Type | Notes |
 |---|---|---|
 | `zone_id` | int | Join against `zones.parquet` for the human-readable name |
-| `string_id` | int | Index within the zone's string DAT |
-| `content` | string | Cleaned text (control codes resolved) |
+| `block` | int | Zero-based block ordinal for this `(zone_id)`. Almost always `0`. A few zones (e.g. Aht Urhgan Whitegate phases) ship multiple string DATs whose IDs collide — each block has its own content |
+| `string_id` | int | Index within the block's string DAT |
+| `content` | string | Cleaned text. Placeholders: `<item>` `<keyitem>` `<player>` `<name>` `<number>` (POLUtils-style); `%` for ambiguous entity refs |
+
+Primary key: `(zone_id, block, string_id)`.
 
 ---
 

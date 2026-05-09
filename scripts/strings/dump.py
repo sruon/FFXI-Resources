@@ -68,24 +68,40 @@ class StringDumper(DumpScript):
         with mp.Pool(os.cpu_count() or 4) as pool:
             results = pool.map(_parse_zone, work)
 
-        zone_data = sorted([r for r in results if r], key=lambda z: z["id"])
+        # Group by zone_id; some zones (Aht Urhgan Whitegate phases) have
+        # multiple string DATs. Each DAT becomes its own block, ordered by
+        # appearance in dats.yaml.
+        groups: dict[int, list] = {}
+        order: list[int] = []
+        for r in results:
+            if not r:
+                continue
+            if r["id"] not in groups:
+                groups[r["id"]] = []
+                order.append(r["id"])
+            groups[r["id"]].append(r)
 
         rows = []
-        for zone in zone_data:
-            for s in zone["strings"]:
-                rows.append({
-                    "zone_id": zone["id"],
-                    "string_id": s["id"],
-                    "content": s["content"],
-                })
+        for zid in sorted(order):
+            for block_idx, zone in enumerate(groups[zid]):
+                for s in zone["strings"]:
+                    rows.append({
+                        "zone_id": zid,
+                        "block": block_idx,
+                        "string_id": s["id"],
+                        "content": s["content"],
+                    })
 
-        logger.info("Parsed {} strings across {} zones", len(rows), len(zone_data))
+        logger.info(
+            "Parsed {} strings across {} zones ({} multi-block zones)",
+            len(rows), len(groups), sum(1 for v in groups.values() if len(v) > 1),
+        )
 
-        meta = {"version": version, "schema_version": 1}
+        meta = {"version": version, "schema_version": 2}
         write_ndjson_gz(rows, os.path.join(output_dir, "strings.ndjson.gz"), meta=meta)
         write_parquet(
             rows, os.path.join(output_dir, "strings.parquet"),
-            sort_by=["zone_id", "string_id"], row_group_size=25_000,
+            sort_by=["zone_id", "block", "string_id"], row_group_size=25_000,
         )
 
 
