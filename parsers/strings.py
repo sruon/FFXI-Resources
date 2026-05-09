@@ -175,7 +175,11 @@ def format_string(text: str) -> str:
             found = False
             for j in range(pos + 1, min(pos + 14, len(text))):
                 if ord(text[j]) == 0x02:
-                    if j <= pos + 1 or ord(text[j - 1]) != 0x29:
+                    if j > pos + 1:
+                        # Always emit a placeholder for non-empty entity refs.
+                        # (Old code skipped emit when the prior byte was 0x29
+                        # which dropped the '%' for item-with-quantity refs
+                        # like 'You obtain <number> <item>!')
                         result.append("%")
                     pos = min(j + 4, len(text))
                     found = True
