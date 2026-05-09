@@ -35,6 +35,7 @@ Both contain the same data. NDJSON has a sidecar `<name>.meta.json` with `versio
 | `merits.{ndjson.gz,parquet}` | Merit names |
 | `augments.{ndjson.gz,parquet}` | Augment template strings |
 | `monster_families.{ndjson.gz,parquet}` | Monster family names (singular + plural) |
+| `zone_layout.{ndjson.gz,parquet}` | RID sub-region entries — fishing areas, doors, zonelines, models, elevators, events (one per row) |
 
 Plus a `<name>.meta.json` for each `.ndjson.gz`:
 
@@ -390,6 +391,52 @@ Monster family display names. Sort: `(id)`.
 ```json
 {"id": 1, "name": "crab", "name_plural": "crabs"}
 ```
+
+---
+
+## zone_layout.ndjson.gz / zone_layout.parquet
+
+One row per RID sub-region entry. Sort: `(zone_id, idx)`. Field layout matches xiregiondump's `all_zones.json` byte-for-byte.
+
+```json
+{
+  "zone_id": 9,
+  "idx": 0,
+  "type": "Elevator",
+  "id_str": "@090",
+  "target_id_str": "    ",
+  "id": 809054272,
+  "target_id": 538976288,
+  "pos_x": 300.0, "pos_y": 13.4161, "pos_z": -60.0,
+  "tex_map_no": 0,
+  "ry": 0.0,
+  "scale_x": 8.0, "scale_y": 50.0, "scale_z": 8.0,
+  "zone_no": 9,
+  "arrow_flag": 80,
+  "lift_height_0": 4795,
+  "lift_height_1": -3520,
+  "lift_current_height": 0.0,
+  "flag": 0,
+  "file_id": null
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `zone_id` / `idx` | int | Composite primary key |
+| `type` | enum | `ZoneLine` \| `Door` \| `FishingArea` \| `Elevator` \| `Event` \| `Model` \| `Unknown` (derived from first byte of `id_str`) |
+| `id_str` / `target_id_str` | string | 4-byte ASCII identifiers; `target_id_str` paired endpoint for ZoneLines and Doors, mostly spaces otherwise |
+| `id` / `target_id` | int | u32 view of the same bytes |
+| `pos_x/y/z` | float | World coordinates |
+| `tex_map_no` | int | Texture map index (mostly 0) |
+| `ry` | float | Rotation around Y axis (radians) |
+| `scale_x/y/z` | float | OBB half-extents (NOT radius) |
+| `zone_no` | int | Polymorphic: Model → raw file id; ZoneLine → destination zone; otherwise 0 or unused |
+| `arrow_flag` | int | Elevator/UI arrow flag |
+| `lift_height_0` / `lift_height_1` | int (i16) | Elevator travel range |
+| `lift_current_height` | float | Elevator initial position |
+| `flag` | int | Door orientation / misc flag |
+| `file_id` | int \| null | Resolved Model file id (`raw < 600 ? raw+100 : raw+83191` over `zone_no`); `null` for non-Model entries |
 
 ---
 
