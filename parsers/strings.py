@@ -161,7 +161,20 @@ def format_string(text: str) -> str:
                     found = True
                     break
             if not found:
-                pos += 1
+                # 0x01 has two roles depending on what precedes it:
+                #   - after a placeholder code (0x05/0x08/0x0A/0x11/0x1C):
+                #     it's a 1-byte format marker; the next byte is a
+                #     literal punctuation char to keep (e.g. "%!" comes
+                #     from 0x11 0x01 0x21).
+                #   - elsewhere: it's a 2-byte control prefix; the next
+                #     byte is a parameter that must be consumed too (e.g.
+                #     0x01 0x60 between two numbers, 0x01 0x1A before
+                #     "The Wyrm God").
+                prev = ord(text[pos - 1]) if pos > 0 else 0
+                if prev in (0x05, 0x08, 0x0A, 0x11, 0x1C):
+                    pos += 1
+                else:
+                    pos += 2
 
         elif b == 0x05:
             result.append("%")
