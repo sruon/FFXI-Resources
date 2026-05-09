@@ -267,20 +267,8 @@ def get_category(item_id: int) -> str:
 
 
 def _extract_icon(dec: bytes) -> str | None:
-    """Extract icon, convert FFXI native format to PNG, return as base64.
-
-    FFXI icon format (2105 bytes for 32x32 8-bit):
-        1 byte image_type (0x91 = BitmapA, 0xA1 = DirectX, 0xB1 = BitmapB)
-        8 bytes category (text)
-        8 bytes id (text)
-        40 bytes BITMAPINFOHEADER
-        256 * 4 bytes palette (BGRA)
-        width * height bytes paletted pixels (bottom-up)
-
-    Palette index 0 is FFXI's transparent color by convention.
-    """
-    import io
-    from PIL import Image
+    """Extract item icon, convert FFXI BitmapA → PNG, return as base64."""
+    from parsers.bitmap import bitmap_a_to_png
 
     if len(dec) < ICON_OFFSET + 4:
         return None
@@ -289,39 +277,8 @@ def _extract_icon(dec: bytes) -> str | None:
         return None
     raw = dec[ICON_OFFSET + 4 : ICON_OFFSET + 4 + size]
 
-    # Only handle BitmapA (0x91) — covers all known item icons
-    if not raw or raw[0] != 0x91 or len(raw) < 57:
-        return None
-
-    width = struct.unpack_from("<I", raw, 21)[0]
-    height = struct.unpack_from("<I", raw, 25)[0]
-    bit_count = struct.unpack_from("<H", raw, 31)[0]
-
-    if bit_count != 8 or width == 0 or height == 0:
-        return None
-
-    palette_offset = 57
-    palette_bytes = raw[palette_offset : palette_offset + 256 * 4]
-    pixel_offset = palette_offset + 256 * 4
-    pixel_bytes = raw[pixel_offset : pixel_offset + width * height]
-    if len(pixel_bytes) != width * height or len(palette_bytes) != 1024:
-        return None
-
-    # BGRA -> RGB palette
-    rgb_palette = bytearray(256 * 3)
-    for i in range(256):
-        b, g, r, _ = palette_bytes[i * 4 : i * 4 + 4]
-        rgb_palette[i * 3 : i * 3 + 3] = bytes([r, g, b])
-
-    img = Image.frombytes("P", (width, height), pixel_bytes)
-    img.putpalette(bytes(rgb_palette))
-    # BMP is bottom-up
-    img = img.transpose(Image.FLIP_TOP_BOTTOM)
-    img.info["transparency"] = 0
-
-    buf = io.BytesIO()
-    img.save(buf, format="PNG", optimize=True)
-    return base64.b64encode(buf.getvalue()).decode("ascii")
+    png = bitmap_a_to_png(raw)
+    return base64.b64encode(png).decode("ascii") if png else None
 
 
 def _build_charges(fields) -> ChargeData | None:

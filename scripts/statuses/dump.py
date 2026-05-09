@@ -8,6 +8,7 @@ import yaml
 from loguru import logger
 
 from xi_tinkerer import parse_dmsg_table, parse_status_info
+from parsers.bitmap import bitmap_a_to_png
 from scripts.base import DumpScript
 from writers.json import write_ndjson_gz
 from writers.parquet import write_parquet
@@ -49,10 +50,10 @@ class StatusDumper(DumpScript):
             sid = entry.get("id", 0)
             name_rec = names_by_id.get(sid, {})
             icon_b64 = entry.get("icon_bytes") or ""
-            try:
-                icon_raw = base64.b64decode(icon_b64) if icon_b64 else b""
-            except Exception:
-                icon_raw = b""
+            # xi-tinkerer trims trailing '=' from base64 output; pad before decode
+            bitmap = base64.b64decode(icon_b64 + "=" * (-len(icon_b64) % 4)) if icon_b64 else b""
+            png = bitmap_a_to_png(bitmap) or b""
+            png_b64 = base64.b64encode(png).decode("ascii") if png else ""
             common = {
                 "id": sid,
                 "name": name_rec.get("name", ""),
@@ -60,8 +61,8 @@ class StatusDumper(DumpScript):
                 "description": entry.get("description", "") or "",
                 "flag": entry.get("flag", 0),
             }
-            rows_ndjson.append({**common, "icon": icon_b64})
-            rows_parquet.append({**common, "icon": icon_raw})
+            rows_ndjson.append({**common, "icon": png_b64})
+            rows_parquet.append({**common, "icon": png})
 
         rows_ndjson.sort(key=lambda r: r["id"])
         rows_parquet.sort(key=lambda r: r["id"])
