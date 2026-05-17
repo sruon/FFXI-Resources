@@ -44,6 +44,68 @@ _SILENT_CODES = {
 # UpdateExtractor's sanitization, and we follow suit.
 _GENERIC_PERCENT_CODES = {0x05}
 
+# 0x7F sub-byte → (bytes_to_consume_including_0x7F, opens_selection)
+# Mirrors POLUtils' DialogTableEntry / SimpleStringTableEntry handling
+# of the 0x7F prefix family. The default (unknown sub-byte) consumes 3.
+_SUB_7F_DISPATCH: dict[int, tuple[int, bool]] = {
+    0x31: (3, False),  # Prompt / N-second delay — clears in_selection
+    0x92: (3, True),   # Singular/Plural Choice — emits "[/", opens selection
+    0x05: (2, False),  # Possible Special Code: 05
+    0x85: (2, False),  # Multiple Choice (Player Gender)
+    0x8D: (3, False),  # Weather Event Parameter
+    0x8E: (3, False),  # Weather Type Parameter
+    0xB1: (3, False),  # Title Parameter
+}
+_SUB_7F_DEFAULT = (3, False)
+
+# 0x07 sub-byte → ordinal suffix that must match for the digit to be
+# preserved. When the suffix matches, the handler only advances past
+# 0x07 itself (pos+=1) so the literal digit survives.
+_ORDINAL_07 = {0x32: "nd", 0x33: "rd"}
+
+# FFXIEncoding multi-byte chars whose obfuscated (raw DAT) form is
+# entirely low-byte, so simple subtract-deobfuscation leaves them intact
+# and format_string then mis-handles them (eats them as control codes or
+# emits a literal second byte). Substitute the known ones at the byte
+# level *before* utf-8 decoding so format_string sees real codepoints.
+#
+# Each pair is the raw DAT byte sequence (FFXIEncoding `table off` byte
+# pair XOR'd with 0x80, since the DAT stores text obfuscated). The 0x03
+# 0x36 (Ω) case is handled separately because the GM placeholder spam
+# uses runs of 7+ omegas and we want to preserve the repeat count.
+_OMEGA_RUN = re.compile(rb"(?:\x03\x36){2,}")
+# The byte pair \x01\x1a is ambiguous: it can be the obfuscated form of
+# FFXIEncoding 0x81 0x9A (★, a decorative char) OR the bytes
+# `<0x01 entity-ref><0x1A keyitem param>`. Disambiguate by lookahead:
+# when followed by printable ASCII text it's the star, when followed by
+# a control byte it's the keyitem-parameter prefix. (7396 has
+# \x01\x1a\x01... = keyitem; 8094 has \x01\x1aThe = star.)
+_STAR_PATTERN = re.compile(rb"\x01\x1a(?=[\x20-\x7e])")
+
+
+def _substitute_multibyte(b: bytes) -> bytes:
+    b = _OMEGA_RUN.sub(lambda m: "Ω".encode("utf-8") * (len(m.group(0)) // 2), b)
+    b = _STAR_PATTERN.sub("★".encode("utf-8"), b)
+    return b
+
+
+def deobfuscate_body(raw_bytes: bytes, encoding: str = "utf-8") -> str:
+    """Deobfuscate a raw string payload from a string DAT into unicode.
+
+    Subtracts 0x80 from high bytes (matches the DAT obfuscation for
+    standard ASCII text), substitutes known FFXIEncoding multi-byte
+    chars (Ω, ★) at the byte level since their obfuscated forms are
+    low bytes that subtract leaves untouched, then UTF-8 decodes.
+    """
+    sub = bytes(b - 0x80 if b >= 0x80 else b for b in raw_bytes).rstrip(b"\x00")
+    sub = _substitute_multibyte(sub)
+    return sub.decode(encoding, errors="replace")
+
+
+# Codepoints above ASCII that format_string keeps in the decoded text
+# (everything else >= 0x80 falls through to the drop branch).
+_KEEP_UNICODE = {ord("Ω"), ord("★")}
+
 
 def parse_string_dat(file_path: str | Path, encoding: str = "utf-8") -> ParsedStringDat:
     with open(file_path, "rb") as f:
@@ -91,9 +153,7 @@ def parse_string_dat(file_path: str | Path, encoding: str = "utf-8") -> ParsedSt
             continue
 
         try:
-            raw_bytes = raw_data[start_pos:end_pos]
-            decoded = bytes(b - 0x80 if b >= 0x80 else b for b in raw_bytes).rstrip(b"\x00")
-            text = decoded.decode(encoding, errors="replace")
+            text = deobfuscate_body(raw_data[start_pos:end_pos], encoding=encoding)
             strings.append(ParsedString(index=i, offset=offset, text=text))
         except Exception as e:
             logger.debug("Failed to decode string at offset {}: {}", offset, e)
@@ -129,42 +189,37 @@ def format_string(text: str) -> str:
         b = ord(text[pos])
 
         if b == 0x07:
-            # 0x07 is line-break / ordinal marker / selection separator
-            if pos + 1 < len(text) and ord(text[pos + 1]) == 0x32:
-                if pos + 3 < len(text) and text[pos + 2 : pos + 4] == "nd":
-                    result.append(" ")
-                    pos += 1
-                else:
-                    pos += 2
-            elif pos + 1 < len(text) and ord(text[pos + 1]) == 0x33:
-                if pos + 3 < len(text) and text[pos + 2 : pos + 4] == "rd":
-                    result.append(" ")
-                    pos += 1
-                else:
-                    pos += 2
+            # 0x07 is line-break / wide-bracket marker / selection
+            # separator / ordinal marker depending on the next byte.
+            nxt = ord(text[pos + 1]) if pos + 1 < len(text) else None
+            if nxt in _ORDINAL_07 and text[pos + 2 : pos + 4] == _ORDINAL_07[nxt]:
+                # Real ordinal ('2nd', '3rd'): emit a separator space
+                # (the 0x07 sits between the previous content and the
+                # ordinal so the rendered text reads "X 2nd Y") and
+                # consume only the 0x07 itself — the digit follows.
+                result.append(" ")
+                pos += 1
+            elif nxt in _ORDINAL_07:
+                # Wide-bracket marker (0x07 0x32 / 0x07 0x33): drop both.
+                pos += 2
             else:
+                # Lone 0x07 — '/' inside a selection block, ' ' otherwise.
                 result.append("/" if in_selection else " ")
                 pos += 1
 
         elif b == 0x7F:
-            # POLUtils 0x7F dispatch (see DialogTableEntry / SimpleStringTableEntry)
+            # POLUtils 0x7F dispatch (DialogTableEntry / SimpleStringTableEntry).
             if pos + 1 >= len(text):
                 pos += 1
                 continue
             sub = ord(text[pos + 1])
-            if sub == 0x31:                      # Prompt / N-Second Delay (3B)
-                in_selection = False
-                pos = _skip(pos, text, 3)
-            elif sub == 0x92:                    # Singular/Plural Choice (3B)
+            consume, opens = _SUB_7F_DISPATCH.get(sub, _SUB_7F_DEFAULT)
+            if opens:
                 result.append("[/")
                 in_selection = True
-                pos = _skip(pos, text, 3)
-            elif sub in (0x05, 0x85):            # Gender open / "Possible Special Code: 05" (2B)
-                pos = _skip(pos, text, 2)
-            elif sub in (0x8D, 0x8E, 0xB1):      # Weather / Title (3B)
-                pos = _skip(pos, text, 3)
-            else:
-                pos = _skip(pos, text, 3)
+            elif sub == 0x31:
+                in_selection = False
+            pos = _skip(pos, text, consume)
 
         elif b == 0x01:
             # 0x01..0x02 is a generic entity-ref substitution. The actual
@@ -203,7 +258,7 @@ def format_string(text: str) -> str:
         elif b in _SILENT_CODES:
             pos = _skip(pos, text, _SILENT_CODES[b])
 
-        elif 0x20 <= b < 0x7F:
+        elif 0x20 <= b < 0x7F or b in _KEEP_UNICODE:
             result.append(text[pos])
             pos += 1
 
