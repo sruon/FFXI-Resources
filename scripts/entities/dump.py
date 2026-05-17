@@ -15,6 +15,20 @@ from writers.parquet import write_parquet
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+def _parse(dat_path: Path) -> list[dict] | None:
+    if not dat_path.exists():
+        return None
+    try:
+        data = parse_entity_names(str(dat_path))
+    except Exception as e:
+        logger.error("Failed to parse {}: {}", dat_path, e)
+        return None
+    return sorted(
+        ({"id": e["id"], "name": e["name"]} for e in data["names"]),
+        key=lambda x: x["id"],
+    )
+
+
 class EntityDumper(DumpScript):
     """FFXI entity name dumper (per zone)"""
     produces = ["entities"]
@@ -24,53 +38,56 @@ class EntityDumper(DumpScript):
             self.spec = yaml.safe_load(f)
 
     def list_files(self) -> list[str]:
-        return [z["dat"] for z in self.spec.get("zones", []) if z.get("dat")]
+        files = []
+        for z in self.spec.get("zones", []):
+            if z.get("dat"):
+                files.append(z["dat"])
+            for ph in z.get("phases") or []:
+                if ph.get("dat"):
+                    files.append(ph["dat"])
+        return files
 
     def dump(self, version: str, base_path: str, output_dir: str):
-        zones = self.spec.get("zones", [])
-        results = []
-
-        for zone in zones:
-            dat_path = Path(base_path) / zone["dat"]
-            if not dat_path.exists():
-                continue
-
-            try:
-                data = parse_entity_names(str(dat_path))
-            except Exception as e:
-                logger.error("Failed to parse {}: {}", zone["name"], e)
-                continue
-
-            entities = sorted(
-                ({"id": e["id"], "name": e["name"]} for e in data["names"]),
-                key=lambda x: x["id"],
-            )
-
-            if entities:
-                results.append({
-                    "id": zone["id"],
-                    "name": zone["name"],
-                    "entities": entities,
-                })
-
-        results.sort(key=lambda z: z["id"])
-
         rows = []
-        for zone in results:
-            for e in zone["entities"]:
-                rows.append({
-                    "zone_id": zone["id"],
-                    "entity_id": e["id"],
-                    "name": e["name"],
-                })
+        phase_zone_count = 0
 
-        logger.info("Parsed {} entities across {} zones", len(rows), len(results))
+        for zone in sorted(self.spec.get("zones", []), key=lambda z: z["id"]):
+            base = _parse(Path(base_path) / zone["dat"])
+            if base:
+                for e in base:
+                    rows.append({
+                        "zone_id": zone["id"],
+                        "block": 0,
+                        "entity_id": e["id"],
+                        "phase": None,
+                        "name": e["name"],
+                    })
 
-        meta = {"version": version, "schema_version": 1}
+            for block_idx, ph in enumerate(zone.get("phases") or [], start=1):
+                entities = _parse(Path(base_path) / ph["dat"])
+                if not entities:
+                    continue
+                phase_zone_count += 1
+                for e in entities:
+                    rows.append({
+                        "zone_id": zone["id"],
+                        "block": block_idx,
+                        "entity_id": e["id"],
+                        "phase": ph["label"],
+                        "name": e["name"],
+                    })
+
+        zone_count = len({(r["zone_id"], r["block"]) for r in rows})
+        logger.info(
+            "Parsed {} entities across {} zone-blocks ({} are phase overlays)",
+            len(rows), zone_count, phase_zone_count,
+        )
+
+        meta = {"version": version, "schema_version": 2}
         write_ndjson_gz(rows, os.path.join(output_dir, "entities.ndjson.gz"), meta=meta)
         write_parquet(
             rows, os.path.join(output_dir, "entities.parquet"),
-            sort_by=["zone_id", "entity_id"],
+            sort_by=["zone_id", "block", "entity_id"],
         )
 
 

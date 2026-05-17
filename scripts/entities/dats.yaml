@@ -263,6 +263,17 @@ zones:
 - id: 86
   name: Everbloom Hollow
   dat: ROM/26/23.DAT
+  phases:
+    - label: 'Moblin Maze: Sanitization Alpha'
+      dat: ROM/214/62.DAT
+    - label: 'Moblin Maze: Aquatic Depopulation'
+      dat: ROM/224/117.DAT
+    - label: 'Meeble Burrows: B-Adjunct'
+      dat: ROM/288/41.DAT
+    - label: 'Meeble Burrows: B-Assistant'
+      dat: ROM/288/42.DAT
+    - label: 'Meeble Burrows: B-Instructor'
+      dat: ROM/288/43.DAT
 - id: 87
   name: Bastok Markets [S]
   dat: ROM/26/24.DAT
@@ -284,6 +295,13 @@ zones:
 - id: 93
   name: Ruhotz Silvermines
   dat: ROM/26/30.DAT
+  phases:
+    - label: 'Moblin Maze: Sanitization Beta'
+      dat: ROM/216/50.DAT
+    - label: 'Moblin Maze: Actualization'
+      dat: ROM/216/53.DAT
+    - label: 'Moblin Maze: Appropriation'
+      dat: ROM/216/54.DAT
 - id: 94
   name: Windurst Waters [S]
   dat: ROM/26/31.DAT
@@ -392,6 +410,25 @@ zones:
 - id: 129
   name: Ghoyu's Reverie
   dat: ROM/26/66.DAT
+  phases:
+    - label: 'Moblin Maze: Sanitization Gamma'
+      dat: ROM/216/51.DAT
+    - label: 'Moblin Maze: Materialization'
+      dat: ROM/216/52.DAT
+    - label: 'Moblin Maze: Liquidation'
+      dat: ROM/216/55.DAT
+    - label: 'Moblin Maze: Revitalization'
+      dat: ROM/238/86.DAT
+    - label: 'Meeble Burrows: Adjunct'
+      dat: ROM/281/80.DAT
+    - label: 'Meeble Burrows: Assistant'
+      dat: ROM/281/81.DAT
+    - label: 'Meeble Burrows: Instructor'
+      dat: ROM/281/82.DAT
+    - label: 'Meeble Burrows: Associate Researcher'
+      dat: ROM/281/83.DAT
+    - label: 'Meeble Burrows: Researcher'
+      dat: ROM/286/102.DAT
 - id: 130
   name: Ru'Aun Gardens
   dat: ROM2/13/103.DAT
