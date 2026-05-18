@@ -890,7 +890,7 @@ zones:
       dat: ROM/363/70.DAT
     - label: 'Odyssey: Sheol C'
       dat: ROM/363/72.DAT
-    - label: 'Odyssey: Sheol — Gaol'
+    - label: 'Odyssey: Sheol: Gaol'
       dat: ROM/364/111.DAT
 - id: 280
   name: Mog Garden
@@ -960,7 +960,7 @@ zones:
       dat: ROM/363/69.DAT
     - label: 'Odyssey: Sheol C'
       dat: ROM/363/71.DAT
-    - label: 'Odyssey: Sheol — Gaol'
+    - label: 'Odyssey: Sheol: Gaol'
       dat: ROM/364/110.DAT
 - id: 299
   name: Gwora - Throne Room

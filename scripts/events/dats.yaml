@@ -2277,7 +2277,7 @@ zones:
         dat: "ROM/363/64.DAT"
       - label: "Odyssey: Sheol C"
         dat: "ROM/363/66.DAT"
-      - label: "Odyssey: Sheol — Gaol"
+      - label: "Odyssey: Sheol: Gaol"
         dat: "ROM/364/109.DAT"
 
   - id: 280
@@ -2437,7 +2437,7 @@ zones:
         dat: "ROM/363/63.DAT"
       - label: "Odyssey: Sheol C"
         dat: "ROM/363/65.DAT"
-      - label: "Odyssey: Sheol — Gaol"
+      - label: "Odyssey: Sheol: Gaol"
         dat: "ROM/364/108.DAT"
 
   - id: 299
