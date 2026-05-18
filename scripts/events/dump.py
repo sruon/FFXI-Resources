@@ -77,7 +77,12 @@ def _parse_zone(args):
     except Exception as e:
         logger.error("Failed to parse events for {}: {}", zone["name"], e)
         return None
-    return {"id": zone["id"], "name": zone["name"], "blocks": result["blocks"]}
+    return {
+        "id": zone["id"],
+        "name": zone["name"],
+        "phase": zone.get("phase"),
+        "blocks": result["blocks"],
+    }
 
 
 def _is_fragment(event_id: int) -> bool:
@@ -99,6 +104,9 @@ class EventDumper(DumpScript):
             dat = zone.get("files", {}).get("events")
             if dat:
                 files.add(dat)
+            for ph in zone.get("phases") or []:
+                if ph.get("dat"):
+                    files.add(ph["dat"])
         return list(files)
 
     def dump(self, version: str, base_path: str, output_dir: str):
@@ -106,7 +114,16 @@ class EventDumper(DumpScript):
         for zone in self.spec.get("zones", []):
             events_dat = zone.get("files", {}).get("events")
             if events_dat:
-                zone_list.append({"id": zone["id"], "name": zone["name"], "events_dat": events_dat})
+                zone_list.append({
+                    "id": zone["id"], "name": zone["name"],
+                    "events_dat": events_dat, "phase": None,
+                })
+            for ph in zone.get("phases") or []:
+                if ph.get("dat"):
+                    zone_list.append({
+                        "id": zone["id"], "name": zone["name"],
+                        "events_dat": ph["dat"], "phase": ph["label"],
+                    })
 
         entities_by_zone = _load_entities_by_zone()
         items_lookup = _load_items()
@@ -119,16 +136,19 @@ class EventDumper(DumpScript):
         with mp.Pool(os.cpu_count() or 4) as pool:
             results = pool.map(_parse_zone, work)
 
-        # Merge spec entries that share zone_id (Aht Urhgan Whitegate phases).
-        merged: dict[int, dict] = {}
+        # Group results by (zone_id, phase) so phase events stay separately
+        # tagged. The legacy Aht Urhgan Whitegate two-DAT case still merges
+        # cleanly because both entries share phase=None.
+        merged: dict[tuple, dict] = {}
         for r in results:
             if not r:
                 continue
-            zid = r["id"]
-            if zid not in merged:
-                merged[zid] = {"id": zid, "name": r["name"], "blocks": []}
-            merged[zid]["blocks"].extend(r["blocks"])
-        zone_data = sorted(merged.values(), key=lambda z: z["id"])
+            key = (r["id"], r.get("phase"))
+            if key not in merged:
+                merged[key] = {"id": r["id"], "name": r["name"],
+                               "phase": r.get("phase"), "blocks": []}
+            merged[key]["blocks"].extend(r["blocks"])
+        zone_data = sorted(merged.values(), key=lambda z: (z["id"], z.get("phase") or ""))
 
         events_rows: list[dict] = []
         decompile_failures = 0
@@ -136,6 +156,7 @@ class EventDumper(DumpScript):
 
         for zone in zone_data:
             zid = zone["id"]
+            phase_label = zone.get("phase")
             zone_entities = entities_by_zone.get(zid, {})
             block_counter: dict[int, int] = {}
             for block in sorted(zone["blocks"], key=lambda b: b["entity_id"]):
@@ -206,6 +227,7 @@ class EventDumper(DumpScript):
                         "zone_id": zid,
                         "actor_id": actor_id,
                         "block": block_idx,
+                        "phase": phase_label,
                         "idx": idx,
                         "event_id": event_id,
                         "entrypoint": entrypoint,
@@ -222,15 +244,16 @@ class EventDumper(DumpScript):
                     })
                     entrypoint += len(byte_code) // 2
 
-        events_rows.sort(key=lambda r: (r["zone_id"], r["actor_id"], r["block"], r["idx"]))
+        events_rows.sort(key=lambda r: (r["zone_id"], r["phase"] or "", r["actor_id"], r["block"], r["idx"]))
 
         decompiled = sum(1 for r in events_rows if r["lua"] is not None)
+        phase_rows = sum(1 for r in events_rows if r["phase"] is not None)
         logger.info(
-            "Parsed {} events ({} decompiled, {} decompile failures, {} analyze failures) across {} zones",
-            len(events_rows), decompiled, decompile_failures, analyze_failures, len(zone_data),
+            "Parsed {} events ({} phase-tagged, {} decompiled, {} decompile failures, {} analyze failures) across {} zone-phase groups",
+            len(events_rows), phase_rows, decompiled, decompile_failures, analyze_failures, len(zone_data),
         )
 
-        meta = {"version": version, "schema_version": 3}
+        meta = {"version": version, "schema_version": 4}
 
         # NDJSON wants regular dicts; parquet wants list-of-tuples for MAP. Convert both views.
         ndjson_rows = []
@@ -247,6 +270,7 @@ class EventDumper(DumpScript):
             pa.field("zone_id", pa.int32()),
             pa.field("actor_id", pa.int64()),
             pa.field("block", pa.int32()),
+            pa.field("phase", pa.string()),
             pa.field("idx", pa.int32()),
             pa.field("event_id", pa.int32()),
             pa.field("entrypoint", pa.int32()),

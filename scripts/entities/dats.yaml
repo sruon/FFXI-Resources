@@ -268,12 +268,12 @@ zones:
       dat: ROM/214/62.DAT
     - label: 'Moblin Maze: Aquatic Depopulation'
       dat: ROM/224/117.DAT
-    - label: 'Meeble Burrows: B-Adjunct'
+    - label: 'Meeble Burrows: B-Adjunct / B-Researcher Emeritus'
       dat: ROM/288/41.DAT
-    - label: 'Meeble Burrows: B-Assistant'
-      dat: ROM/288/42.DAT
-    - label: 'Meeble Burrows: B-Instructor'
-      dat: ROM/288/43.DAT
+    - label: 'Meeble Burrows: S-Researcher'
+      dat: ROM/286/102.DAT
+    - label: 'Meeble Burrows: B-Researcher'
+      dat: ROM/288/45.DAT
 - id: 87
   name: Bastok Markets [S]
   dat: ROM/26/24.DAT
@@ -302,6 +302,12 @@ zones:
       dat: ROM/216/53.DAT
     - label: 'Moblin Maze: Appropriation'
       dat: ROM/216/54.DAT
+    - label: 'Meeble Burrows: B-Assistant'
+      dat: ROM/288/42.DAT
+    - label: 'Meeble Burrows: S-Associate Researcher'
+      dat: ROM/281/83.DAT
+    - label: 'Meeble Burrows: B-Associate Researcher'
+      dat: ROM/288/44.DAT
 - id: 94
   name: Windurst Waters [S]
   dat: ROM/26/31.DAT
@@ -419,16 +425,14 @@ zones:
       dat: ROM/216/55.DAT
     - label: 'Moblin Maze: Revitalization'
       dat: ROM/238/86.DAT
-    - label: 'Meeble Burrows: Adjunct'
+    - label: 'Meeble Burrows: S-Adjunct'
       dat: ROM/281/80.DAT
-    - label: 'Meeble Burrows: Assistant'
+    - label: 'Meeble Burrows: S-Assistant'
       dat: ROM/281/81.DAT
-    - label: 'Meeble Burrows: Instructor'
+    - label: 'Meeble Burrows: S-Instructor / S-Researcher Emeritus'
       dat: ROM/281/82.DAT
-    - label: 'Meeble Burrows: Associate Researcher'
-      dat: ROM/281/83.DAT
-    - label: 'Meeble Burrows: Researcher'
-      dat: ROM/286/102.DAT
+    - label: 'Meeble Burrows: B-Instructor'
+      dat: ROM/288/43.DAT
 - id: 130
   name: Ru'Aun Gardens
   dat: ROM2/13/103.DAT
@@ -441,6 +445,9 @@ zones:
 - id: 133
   name: Outer Ra'Kaznar [U2]
   dat: ROM9/8/71.DAT
+  phases:
+    - label: Sortie
+      dat: ROM/373/60.DAT
 - id: 134
   name: Dynamis - Beaucedine
   dat: ROM2/13/104.DAT
@@ -609,6 +616,9 @@ zones:
 - id: 189
   name: Outer Ra'Kaznar [U3]
   dat: ROM/26/126.DAT
+  phases:
+    - label: Sortie
+      dat: ROM/376/31.DAT
 - id: 190
   name: King Ranperre's Tomb
   dat: ROM/26/127.DAT
@@ -858,6 +868,9 @@ zones:
 - id: 275
   name: Outer Ra'Kaznar [U1]
   dat: ROM9/6/64.DAT
+  phases:
+    - label: Sortie
+      dat: ROM/373/59.DAT
 - id: 276
   name: Ra'Kaznar Inner Court
   dat: ROM9/6/65.DAT
@@ -870,6 +883,15 @@ zones:
 - id: 279
   name: Walk of Echoes [P2]
   dat: ROM9/6/68.DAT
+  phases:
+    - label: 'Odyssey: Sheol A'
+      dat: ROM/363/68.DAT
+    - label: 'Odyssey: Sheol B'
+      dat: ROM/363/70.DAT
+    - label: 'Odyssey: Sheol C'
+      dat: ROM/363/72.DAT
+    - label: 'Odyssey: Sheol — Gaol'
+      dat: ROM/364/111.DAT
 - id: 280
   name: Mog Garden
   dat: ROM/303/36.DAT
@@ -906,6 +928,13 @@ zones:
 - id: 292
   name: Reisenjima Henge
   dat: ROM/353/61.DAT
+  phases:
+    - label: "TVR Mission 6-2: Nii's Last Stand"
+      dat: ROM/371/62.DAT
+    - label: "TVR Mission 6-3: Zhuu Buxu's Gambit"
+      dat: ROM/371/63.DAT
+    - label: 'TVR: Tireless Tracker (Dance of the Tengu BCNM)'
+      dat: ROM/371/64.DAT
 - id: 293
   name: Reisenjima Sanctorium
   dat: ROM/342/95.DAT
@@ -924,6 +953,15 @@ zones:
 - id: 298
   name: Walk of Echoes [P1]
   dat: ROM/361/92.DAT
+  phases:
+    - label: 'Odyssey: Sheol A'
+      dat: ROM/363/67.DAT
+    - label: 'Odyssey: Sheol B'
+      dat: ROM/363/69.DAT
+    - label: 'Odyssey: Sheol C'
+      dat: ROM/363/71.DAT
+    - label: 'Odyssey: Sheol — Gaol'
+      dat: ROM/364/110.DAT
 - id: 299
   name: Gwora - Throne Room
   dat: ROM/378/106.DAT

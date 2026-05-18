@@ -4,3 +4,5 @@ __pycache__/
 .idea/
 .claude/
 SESSION_NOTES.md
+docs/UNMAPPED_DATS.md
+ruvector.db
