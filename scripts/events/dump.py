@@ -80,7 +80,7 @@ def _parse_zone(args):
     return {
         "id": zone["id"],
         "name": zone["name"],
-        "phase": zone.get("phase"),
+        "layer": zone.get("layer"),
         "blocks": result["blocks"],
     }
 
@@ -104,7 +104,7 @@ class EventDumper(DumpScript):
             dat = zone.get("files", {}).get("events")
             if dat:
                 files.add(dat)
-            for ph in zone.get("phases") or []:
+            for ph in zone.get("layers") or []:
                 if ph.get("dat"):
                     files.add(ph["dat"])
         return list(files)
@@ -116,13 +116,13 @@ class EventDumper(DumpScript):
             if events_dat:
                 zone_list.append({
                     "id": zone["id"], "name": zone["name"],
-                    "events_dat": events_dat, "phase": None,
+                    "events_dat": events_dat, "layer": None,
                 })
-            for ph in zone.get("phases") or []:
+            for ph in zone.get("layers") or []:
                 if ph.get("dat"):
                     zone_list.append({
                         "id": zone["id"], "name": zone["name"],
-                        "events_dat": ph["dat"], "phase": ph["label"],
+                        "events_dat": ph["dat"], "layer": ph["label"],
                     })
 
         entities_by_zone = _load_entities_by_zone()
@@ -136,19 +136,19 @@ class EventDumper(DumpScript):
         with mp.Pool(os.cpu_count() or 4) as pool:
             results = pool.map(_parse_zone, work)
 
-        # Group results by (zone_id, phase) so phase events stay separately
+        # Group results by (zone_id, layer) so layer events stay separately
         # tagged. The legacy Aht Urhgan Whitegate two-DAT case still merges
-        # cleanly because both entries share phase=None.
+        # cleanly because both entries share layer=None.
         merged: dict[tuple, dict] = {}
         for r in results:
             if not r:
                 continue
-            key = (r["id"], r.get("phase"))
+            key = (r["id"], r.get("layer"))
             if key not in merged:
                 merged[key] = {"id": r["id"], "name": r["name"],
-                               "phase": r.get("phase"), "blocks": []}
+                               "layer": r.get("layer"), "blocks": []}
             merged[key]["blocks"].extend(r["blocks"])
-        zone_data = sorted(merged.values(), key=lambda z: (z["id"], z.get("phase") or ""))
+        zone_data = sorted(merged.values(), key=lambda z: (z["id"], z.get("layer") or ""))
 
         events_rows: list[dict] = []
         decompile_failures = 0
@@ -156,7 +156,7 @@ class EventDumper(DumpScript):
 
         for zone in zone_data:
             zid = zone["id"]
-            phase_label = zone.get("phase")
+            layer_label = zone.get("layer")
             zone_entities = entities_by_zone.get(zid, {})
             block_counter: dict[int, int] = {}
             for block in sorted(zone["blocks"], key=lambda b: b["entity_id"]):
@@ -227,7 +227,7 @@ class EventDumper(DumpScript):
                         "zone_id": zid,
                         "actor_id": actor_id,
                         "block": block_idx,
-                        "phase": phase_label,
+                        "layer": layer_label,
                         "idx": idx,
                         "event_id": event_id,
                         "entrypoint": entrypoint,
@@ -244,13 +244,13 @@ class EventDumper(DumpScript):
                     })
                     entrypoint += len(byte_code) // 2
 
-        events_rows.sort(key=lambda r: (r["zone_id"], r["phase"] or "", r["actor_id"], r["block"], r["idx"]))
+        events_rows.sort(key=lambda r: (r["zone_id"], r["layer"] or "", r["actor_id"], r["block"], r["idx"]))
 
         decompiled = sum(1 for r in events_rows if r["lua"] is not None)
-        phase_rows = sum(1 for r in events_rows if r["phase"] is not None)
+        layer_rows = sum(1 for r in events_rows if r["layer"] is not None)
         logger.info(
-            "Parsed {} events ({} phase-tagged, {} decompiled, {} decompile failures, {} analyze failures) across {} zone-phase groups",
-            len(events_rows), phase_rows, decompiled, decompile_failures, analyze_failures, len(zone_data),
+            "Parsed {} events ({} layer-tagged, {} decompiled, {} decompile failures, {} analyze failures) across {} zone-layer groups",
+            len(events_rows), layer_rows, decompiled, decompile_failures, analyze_failures, len(zone_data),
         )
 
         meta = {"version": version, "schema_version": 4}
@@ -270,7 +270,7 @@ class EventDumper(DumpScript):
             pa.field("zone_id", pa.int32()),
             pa.field("actor_id", pa.int64()),
             pa.field("block", pa.int32()),
-            pa.field("phase", pa.string()),
+            pa.field("layer", pa.string()),
             pa.field("idx", pa.int32()),
             pa.field("event_id", pa.int32()),
             pa.field("entrypoint", pa.int32()),

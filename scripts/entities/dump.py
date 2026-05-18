@@ -42,14 +42,14 @@ class EntityDumper(DumpScript):
         for z in self.spec.get("zones", []):
             if z.get("dat"):
                 files.append(z["dat"])
-            for ph in z.get("phases") or []:
+            for ph in z.get("layers") or []:
                 if ph.get("dat"):
                     files.append(ph["dat"])
         return files
 
     def dump(self, version: str, base_path: str, output_dir: str):
         rows = []
-        phase_zone_count = 0
+        layer_zone_count = 0
 
         for zone in sorted(self.spec.get("zones", []), key=lambda z: z["id"]):
             base = _parse(Path(base_path) / zone["dat"])
@@ -59,28 +59,28 @@ class EntityDumper(DumpScript):
                         "zone_id": zone["id"],
                         "block": 0,
                         "entity_id": e["id"],
-                        "phase": None,
+                        "layer": None,
                         "name": e["name"],
                     })
 
-            for block_idx, ph in enumerate(zone.get("phases") or [], start=1):
+            for block_idx, ph in enumerate(zone.get("layers") or [], start=1):
                 entities = _parse(Path(base_path) / ph["dat"])
                 if not entities:
                     continue
-                phase_zone_count += 1
+                layer_zone_count += 1
                 for e in entities:
                     rows.append({
                         "zone_id": zone["id"],
                         "block": block_idx,
                         "entity_id": e["id"],
-                        "phase": ph["label"],
+                        "layer": ph["label"],
                         "name": e["name"],
                     })
 
         zone_count = len({(r["zone_id"], r["block"]) for r in rows})
         logger.info(
-            "Parsed {} entities across {} zone-blocks ({} are phase overlays)",
-            len(rows), zone_count, phase_zone_count,
+            "Parsed {} entities across {} zone-blocks ({} are layer overlays)",
+            len(rows), zone_count, layer_zone_count,
         )
 
         meta = {"version": version, "schema_version": 2}

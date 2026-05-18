@@ -700,7 +700,7 @@ zones:
       events: "ROM/20/23.DAT"
       strings_jp: "ROM/22/23.DAT"
       strings_na: "ROM/24/23.DAT"
-    phases:
+    layers:
       - label: "Moblin Maze: Sanitization Alpha"
         dat: "ROM/214/61.DAT"
       - label: "Moblin Maze: Aquatic Depopulation"
@@ -767,7 +767,7 @@ zones:
       events: "ROM/20/30.DAT"
       strings_jp: "ROM/22/30.DAT"
       strings_na: "ROM/24/30.DAT"
-    phases:
+    layers:
       - label: "Moblin Maze: Sanitization Beta"
         dat: "ROM/216/44.DAT"
       - label: "Moblin Maze: Actualization"
@@ -1068,7 +1068,7 @@ zones:
       events: "ROM/20/66.DAT"
       strings_jp: "ROM/22/66.DAT"
       strings_na: "ROM/24/66.DAT"
-    phases:
+    layers:
       - label: "Moblin Maze: Sanitization Gamma"
         dat: "ROM/216/45.DAT"
       - label: "Moblin Maze: Materialization"
@@ -1117,7 +1117,7 @@ zones:
       events: "ROM9/8/68.DAT"
       strings_jp: "ROM9/8/69.DAT"
       strings_na: "ROM9/8/70.DAT"
-    phases:
+    layers:
       - label: "Sortie"
         dat: "ROM/373/41.DAT"
 
@@ -1568,7 +1568,7 @@ zones:
       events: "ROM/20/126.DAT"
       strings_jp: "ROM/22/126.DAT"
       strings_na: "ROM/24/126.DAT"
-    phases:
+    layers:
       - label: "Sortie"
         dat: "ROM/376/30.DAT"
 
@@ -2235,7 +2235,7 @@ zones:
       events: "ROM9/5/72.DAT"
       strings_jp: "ROM9/5/96.DAT"
       strings_na: "ROM9/5/120.DAT"
-    phases:
+    layers:
       - label: "Sortie"
         dat: "ROM/373/40.DAT"
 
@@ -2270,7 +2270,7 @@ zones:
       events: "ROM9/5/76.DAT"
       strings_jp: "ROM9/5/100.DAT"
       strings_na: "ROM9/5/124.DAT"
-    phases:
+    layers:
       - label: "Odyssey: Sheol A"
         dat: "ROM/363/62.DAT"
       - label: "Odyssey: Sheol B"
@@ -2375,7 +2375,7 @@ zones:
       events: "ROM/353/56.DAT"
       strings_jp: "ROM/353/57.DAT"
       strings_na: "ROM/353/58.DAT"
-    phases:
+    layers:
       - label: "TVR Mission 6-2: Nii's Last Stand"
         dat: "ROM/371/59.DAT"
       - label: "TVR Mission 6-3: Zhuu Buxu's Gambit"
@@ -2430,7 +2430,7 @@ zones:
       events: "ROM/361/87.DAT"
       strings_jp: "ROM/361/88.DAT"
       strings_na: "ROM/361/89.DAT"
-    phases:
+    layers:
       - label: "Odyssey: Sheol A"
         dat: "ROM/363/61.DAT"
       - label: "Odyssey: Sheol B"

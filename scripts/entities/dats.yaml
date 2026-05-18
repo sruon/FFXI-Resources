@@ -263,7 +263,7 @@ zones:
 - id: 86
   name: Everbloom Hollow
   dat: ROM/26/23.DAT
-  phases:
+  layers:
     - label: 'Moblin Maze: Sanitization Alpha'
       dat: ROM/214/62.DAT
     - label: 'Moblin Maze: Aquatic Depopulation'
@@ -295,7 +295,7 @@ zones:
 - id: 93
   name: Ruhotz Silvermines
   dat: ROM/26/30.DAT
-  phases:
+  layers:
     - label: 'Moblin Maze: Sanitization Beta'
       dat: ROM/216/50.DAT
     - label: 'Moblin Maze: Actualization'
@@ -416,7 +416,7 @@ zones:
 - id: 129
   name: Ghoyu's Reverie
   dat: ROM/26/66.DAT
-  phases:
+  layers:
     - label: 'Moblin Maze: Sanitization Gamma'
       dat: ROM/216/51.DAT
     - label: 'Moblin Maze: Materialization'
@@ -445,7 +445,7 @@ zones:
 - id: 133
   name: Outer Ra'Kaznar [U2]
   dat: ROM9/8/71.DAT
-  phases:
+  layers:
     - label: Sortie
       dat: ROM/373/60.DAT
 - id: 134
@@ -616,7 +616,7 @@ zones:
 - id: 189
   name: Outer Ra'Kaznar [U3]
   dat: ROM/26/126.DAT
-  phases:
+  layers:
     - label: Sortie
       dat: ROM/376/31.DAT
 - id: 190
@@ -868,7 +868,7 @@ zones:
 - id: 275
   name: Outer Ra'Kaznar [U1]
   dat: ROM9/6/64.DAT
-  phases:
+  layers:
     - label: Sortie
       dat: ROM/373/59.DAT
 - id: 276
@@ -883,7 +883,7 @@ zones:
 - id: 279
   name: Walk of Echoes [P2]
   dat: ROM9/6/68.DAT
-  phases:
+  layers:
     - label: 'Odyssey: Sheol A'
       dat: ROM/363/68.DAT
     - label: 'Odyssey: Sheol B'
@@ -928,7 +928,7 @@ zones:
 - id: 292
   name: Reisenjima Henge
   dat: ROM/353/61.DAT
-  phases:
+  layers:
     - label: "TVR Mission 6-2: Nii's Last Stand"
       dat: ROM/371/62.DAT
     - label: "TVR Mission 6-3: Zhuu Buxu's Gambit"
@@ -953,7 +953,7 @@ zones:
 - id: 298
   name: Walk of Echoes [P1]
   dat: ROM/361/92.DAT
-  phases:
+  layers:
     - label: 'Odyssey: Sheol A'
       dat: ROM/363/67.DAT
     - label: 'Odyssey: Sheol B'
