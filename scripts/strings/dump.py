@@ -46,6 +46,7 @@ def _parse_zone(args):
     return {
         "id": zone["id"],
         "name": zone["name"],
+        "layer": zone.get("layer"),
         "strings": strings,
     }
 
@@ -59,50 +60,72 @@ class StringDumper(DumpScript):
             self.spec = yaml.safe_load(f)
 
     def list_files(self) -> list[str]:
-        return [z["dat"] for z in self.spec.get("zones", []) if z.get("dat")]
+        files = []
+        for z in self.spec.get("zones", []):
+            if z.get("dat"):
+                files.append(z["dat"])
+            for ly in z.get("layers") or []:
+                if ly.get("dat"):
+                    files.append(ly["dat"])
+        return files
 
     def dump(self, version: str, base_path: str, output_dir: str):
         zones = self.spec.get("zones", [])
+        work = []
+        for z in zones:
+            work.append(({"id": z["id"], "name": z["name"], "dat": z.get("dat"), "layer": None}, base_path))
+            for ly in z.get("layers") or []:
+                if ly.get("dat"):
+                    work.append((
+                        {"id": z["id"], "name": z["name"], "dat": ly["dat"], "layer": ly["label"]},
+                        base_path,
+                    ))
 
-        work = [(zone, base_path) for zone in zones]
         with mp.Pool(os.cpu_count() or 4) as pool:
             results = pool.map(_parse_zone, work)
 
-        # Group by zone_id; some zones (Aht Urhgan Whitegate phases) have
-        # multiple string DATs. Each DAT becomes its own block, ordered by
-        # appearance in dats.yaml.
-        groups: dict[int, list] = {}
-        order: list[int] = []
+        # Group by (zone_id, layer) so layer strings stay tagged. The legacy
+        # Aht Urhgan Whitegate two-DAT case still merges (both layer=None).
+        groups: dict[tuple, list] = {}
+        order: list[tuple] = []
         for r in results:
             if not r:
                 continue
-            if r["id"] not in groups:
-                groups[r["id"]] = []
-                order.append(r["id"])
-            groups[r["id"]].append(r)
+            key = (r["id"], r.get("layer"))
+            if key not in groups:
+                groups[key] = []
+                order.append(key)
+            groups[key].append(r)
 
         rows = []
-        for zid in sorted(order):
-            for block_idx, zone in enumerate(groups[zid]):
+        # Sort: base zone first (layer=None), then layers alphabetically, per zone_id.
+        for key in sorted(order, key=lambda k: (k[0], k[1] or "")):
+            zid, layer = key
+            for block_idx, zone in enumerate(groups[key]):
                 for s in zone["strings"]:
                     rows.append({
                         "zone_id": zid,
                         "block": block_idx,
                         "string_id": s["id"],
+                        "layer": layer,
                         "content": s["content"],
                     })
 
+        layer_rows = sum(1 for r in rows if r["layer"] is not None)
         logger.info(
-            "Parsed {} strings across {} zones ({} multi-block zones)",
-            len(rows), len(groups), sum(1 for v in groups.values() if len(v) > 1),
+            "Parsed {} strings ({} layer-tagged) across {} zone-layer groups",
+            len(rows), layer_rows, len(groups),
         )
 
-        meta = {"version": version, "schema_version": 2}
+        meta = {"version": version, "schema_version": 3}
         write_ndjson_gz(rows, os.path.join(output_dir, "strings.ndjson.gz"), meta=meta)
         write_parquet(
             rows, os.path.join(output_dir, "strings.parquet"),
             sort_by=["zone_id", "block", "string_id"], row_group_size=25_000,
         )
+
+        # Note: primary key is (zone_id, block, string_id, layer) — layer
+        # disambiguates same-zone overlays from the base zone strings.
 
 
 if __name__ == "__main__":

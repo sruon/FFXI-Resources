@@ -931,9 +931,9 @@ zones:
   layers:
     - label: "TVR Mission 6-2: Nii's Last Stand"
       dat: ROM/371/62.DAT
-    - label: "TVR Mission 6-3: Zhuu Buxu's Gambit"
+    - label: "TVR 6-3: Dance with the Tengu (Phase 1)"
       dat: ROM/371/63.DAT
-    - label: 'TVR: Tireless Tracker (Dance of the Tengu BCNM)'
+    - label: 'TVR 6-3: Dance with the Tengu (Phase 2)'
       dat: ROM/371/64.DAT
 - id: 293
   name: Reisenjima Sanctorium
