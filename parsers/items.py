@@ -41,7 +41,8 @@ from models.items import (
     GeneralItem,
 )
 
-RECORD_SIZE = 0xC00
+RECORD_SIZE = 0x1400  # 0xC00 before the Sep 2026 client; tail past the icon is zero padding
+FIELDS_OFFSET = 0x10
 ICON_OFFSET = 0x280
 FUD_FIRST_ENTRY = 0x170
 
@@ -53,6 +54,7 @@ ItemHeader = cs.Struct(
     "id" / cs.Int16ul,
     cs.Padding(2),
     "flags" / cs.Int16ul,
+    cs.Padding(2),
     "stack_size" / cs.Int16ul,
     "item_type" / cs.Int16ul,
     "resource_id" / cs.Int16ul,
@@ -63,6 +65,7 @@ WeaponFields = cs.Struct(
     "level" / cs.Int16ul,
     "slots" / cs.Int16ul,
     "races" / cs.Int16ul,
+    cs.Padding(2),
     "jobs" / cs.Int32ul,
     "superior_level" / cs.Int8ul,
     cs.Padding(1),
@@ -87,6 +90,7 @@ ArmorFields = cs.Struct(
     "level" / cs.Int16ul,
     "slots" / cs.Int16ul,
     "races" / cs.Int16ul,
+    cs.Padding(2),
     "jobs" / cs.Int32ul,
     "superior_level" / cs.Int8ul,
     cs.Padding(1),
@@ -111,11 +115,12 @@ UsableFields = cs.Struct(
     "cast_time_raw" / cs.Int16ul,
     "unknown1" / cs.Int32ul,
     "unknown2" / cs.Int32ul,
-    "unknown3" / cs.Int32ul,
+    "unknown3" / cs.Int16ul,
 )
 
 PuppetFields = cs.Struct(
     "slot" / cs.Int16ul,
+    cs.Padding(2),
     "element_charge" / cs.Int32ul,
     "unknown1" / cs.Int32ul,
 )
@@ -133,12 +138,15 @@ InstinctFields = cs.Struct(
 
 SlipFields = cs.Struct(
     "unknown1" / cs.Int16ul,
-    "unknowns" / cs.Array(17, cs.Int32ul),
+    "unknown2" / cs.Int16ul,
+    "unknowns" / cs.Array(16, cs.Int32ul),
 )
 
 MonipulatorFields = cs.Struct(
     "unknown1" / cs.Int16ul,
-    "unknowns" / cs.Array(24, cs.Int32ul),
+    "unknowns_a" / cs.Array(8, cs.Int32ul),
+    cs.Padding(2),
+    "unknowns_b" / cs.Array(16, cs.Int32ul),
 )
 
 FudEntry = cs.Struct(
@@ -293,7 +301,7 @@ def _build_charges(fields) -> ChargeData | None:
 
 
 def _build_weapon(dec: bytes) -> WeaponData:
-    f = WeaponFields.parse(dec[0x0E:])
+    f = WeaponFields.parse(dec[FIELDS_OFFSET:])
     slots = decode_bitmask(f.slots, EQUIPMENT_SLOTS, 0, 16)
     races = decode_bitmask(f.races, RACES, 1, 9)
     jobs = decode_bitmask(f.jobs, JOBS, 1, 23)
@@ -329,7 +337,7 @@ def _build_weapon(dec: bytes) -> WeaponData:
 
 
 def _build_armor(dec: bytes) -> ArmorData:
-    f = ArmorFields.parse(dec[0x0E:])
+    f = ArmorFields.parse(dec[FIELDS_OFFSET:])
     return ArmorData(
         level=f.level,
         slots=decode_bitmask(f.slots, EQUIPMENT_SLOTS, 0, 16),
@@ -346,7 +354,7 @@ def _build_armor(dec: bytes) -> ArmorData:
 
 
 def _build_furnishing(dec: bytes, item_id: int, furniture_properties: dict) -> FurnishingData:
-    f = FurnishingFields.parse(dec[0x0E:])
+    f = FurnishingFields.parse(dec[FIELDS_OFFSET:])
     props = furniture_properties.get(item_id, {})
     return FurnishingData(
         element=ELEMENTS.get(f.element, str(f.element)),
@@ -357,7 +365,7 @@ def _build_furnishing(dec: bytes, item_id: int, furniture_properties: dict) -> F
 
 
 def _build_usable(dec: bytes) -> UsableData:
-    f = UsableFields.parse(dec[0x0E:])
+    f = UsableFields.parse(dec[FIELDS_OFFSET:])
     return UsableData(
         cast_time=f.cast_time_raw / 4.0 if f.cast_time_raw else None,
         unknown1=f.unknown1 or None,
@@ -367,7 +375,7 @@ def _build_usable(dec: bytes) -> UsableData:
 
 
 def _build_puppet(dec: bytes) -> PuppetData:
-    f = PuppetFields.parse(dec[0x0E:])
+    f = PuppetFields.parse(dec[FIELDS_OFFSET:])
     return PuppetData(
         slot=f.slot,
         element_charge=f.element_charge,
@@ -376,7 +384,7 @@ def _build_puppet(dec: bytes) -> PuppetData:
 
 
 def _build_instinct(dec: bytes) -> InstinctData:
-    f = InstinctFields.parse(dec[0x0E:])
+    f = InstinctFields.parse(dec[FIELDS_OFFSET:])
     return InstinctData(
         instinct_cost=f.instinct_cost,
         unknown1=f.unknown1 or None,
@@ -390,13 +398,13 @@ def _build_instinct(dec: bytes) -> InstinctData:
 
 
 def _build_slip(dec: bytes) -> SlipData:
-    f = SlipFields.parse(dec[0x0E:])
-    return SlipData(unknown1=f.unknown1 or None, unknowns=list(f.unknowns))
+    f = SlipFields.parse(dec[FIELDS_OFFSET:])
+    return SlipData(unknown1=f.unknown1 or None, unknowns=[f.unknown2, *f.unknowns])
 
 
 def _build_monipulator(dec: bytes) -> MonipulatorData:
-    f = MonipulatorFields.parse(dec[0x0E:])
-    return MonipulatorData(unknown1=f.unknown1 or None, unknowns=list(f.unknowns))
+    f = MonipulatorFields.parse(dec[FIELDS_OFFSET:])
+    return MonipulatorData(unknown1=f.unknown1 or None, unknowns=[*f.unknowns_a, *f.unknowns_b])
 
 
 def _build_names(dec: bytes, dec_ja: bytes | None) -> tuple[ItemName, ItemDescription]:
